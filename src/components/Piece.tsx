@@ -1,14 +1,15 @@
 import { useMemo, useRef, useEffect } from 'react';
-import { Vector2, Vector3, Color } from 'three';
+import { Vector2, Vector3, Color, Mesh } from 'three';
 import { useFrame } from '@react-three/fiber';
 
 interface PieceProps {
     type: string; // p, r, n, b, q, k
     color: 'w' | 'b';
     position: [number, number, number]; // target board position
+    isCaptured?: boolean;
 }
 
-export const Piece = ({ type, color, position }: PieceProps) => {
+export const Piece = ({ type, color, position, isCaptured }: PieceProps) => {
     const isWhite = color === 'w';
     const materialColor = isWhite ? '#ffffff' : '#1a1a1a';
 
@@ -65,8 +66,8 @@ export const Piece = ({ type, color, position }: PieceProps) => {
     }, [type]);
 
     // ---- Animation refs ----
-    const meshRef = useRef<THREE.Mesh>(null);
-    const trailRef = useRef<THREE.Mesh>(null);
+    const meshRef = useRef<Mesh>(null);
+    const trailRef = useRef<Mesh>(null);
     const startPos = useRef<Vector3>(new Vector3(...position));
     const targetPos = useRef<Vector3>(new Vector3(...position));
     const progress = useRef(0);
@@ -97,13 +98,26 @@ export const Piece = ({ type, color, position }: PieceProps) => {
 
     // Frame loop: move piece and fade trail
     useFrame((_state, delta) => {
+        // Handle capture animation
+        if (isCaptured && meshRef.current) {
+            const mat = meshRef.current.material as any;
+            // Fade out and scale down
+            mat.opacity = Math.max(0, mat.opacity - delta * 2);
+            mat.transparent = true;
+            const s = Math.max(0, meshRef.current.scale.x - delta * 2);
+            meshRef.current.scale.set(s, s, s);
+            return;
+        }
+
         if (!animating.current) return;
         progress.current += delta * 2.5; // ~0.4s duration
         if (progress.current >= 1) {
             progress.current = 1;
             animating.current = false;
         }
-        const lerpPos = startPos.current.clone().lerp(targetPos.current, progress.current);
+        // Ease out cubic function: 1 - (1 - t)^3
+        const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+        const lerpPos = startPos.current.clone().lerp(targetPos.current, easeOutCubic(progress.current));
         if (meshRef.current) meshRef.current.position.copy(lerpPos);
         // Fade trail opacity while moving
         if (trailRef.current && trailRef.current.visible) {

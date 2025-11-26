@@ -4,17 +4,17 @@ import { useChessGame } from '../hooks/useChessGame';
 import { RotateCcw } from 'lucide-react';
 
 const Game = () => {
-    const { fen, makeMove, turn, isGameOver, winner, resetGame, getPossibleMoves } = useChessGame();
+    const { makeMove, turn, isGameOver, winner, resetGame, getPossibleMoves, pieces } = useChessGame();
 
     return (
         <div style={{ width: '100%', height: '100%', position: 'relative', background: '#1a1a1a' }}>
             <Canvas shadows camera={{ position: [0, 8, 8], fov: 45 }}>
                 <color attach="background" args={['#1a1a1a']} />
                 <Scene
-                    fen={fen}
                     onMove={makeMove}
                     turn={turn}
                     getPossibleMoves={getPossibleMoves}
+                    pieces={pieces}
                 />
             </Canvas>
 

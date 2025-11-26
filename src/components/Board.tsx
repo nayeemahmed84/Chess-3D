@@ -1,15 +1,16 @@
 import { useMemo, useState } from 'react';
 import { Square } from 'chess.js';
 import { Piece } from './Piece';
+import { PieceState } from '../hooks/useChessGame';
 
 interface BoardProps {
-    fen: string;
     onMove: (from: Square, to: Square) => boolean;
     turn: string;
     getPossibleMoves: (square: Square) => string[];
+    pieces: PieceState[];
 }
 
-export const Board = ({ fen, onMove, turn, getPossibleMoves }: BoardProps) => {
+export const Board = ({ onMove, turn, getPossibleMoves, pieces }: BoardProps) => {
     const [selectedSquare, setSelectedSquare] = useState<Square | null>(null);
     const [possibleMoves, setPossibleMoves] = useState<string[]>([]);
 
@@ -32,32 +33,13 @@ export const Board = ({ fen, onMove, turn, getPossibleMoves }: BoardProps) => {
         return sqs;
     }, []);
 
-    const pieces = useMemo(() => {
-        const p: { type: string; color: string; square: Square; x: number; z: number }[] = [];
-        const rows = fen.split(' ')[0].split('/');
+    // Helper to get coordinates from square name
+    const getSquareCoords = (square: Square) => {
         const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
-
-        rows.forEach((row, rankIndex) => {
-            let fileIndex = 0;
-            for (const char of row) {
-                if (isNaN(parseInt(char))) {
-                    const color = char === char.toUpperCase() ? 'w' : 'b';
-                    const type = char.toLowerCase();
-                    p.push({
-                        type,
-                        color,
-                        square: `${files[fileIndex]}${8 - rankIndex}` as Square,
-                        x: fileIndex - 3.5,
-                        z: rankIndex - 3.5
-                    });
-                    fileIndex++;
-                } else {
-                    fileIndex += parseInt(char);
-                }
-            }
-        });
-        return p;
-    }, [fen]);
+        const file = files.indexOf(square[0]);
+        const rank = 8 - parseInt(square[1]);
+        return { x: file - 3.5, z: rank - 3.5 };
+    };
 
     const handleSquareClick = (squareName: Square) => {
         if (selectedSquare) {
@@ -127,14 +109,18 @@ export const Board = ({ fen, onMove, turn, getPossibleMoves }: BoardProps) => {
             ))}
 
             {/* Pieces */}
-            {pieces.map((p) => (
-                <Piece
-                    key={`${p.square}-${p.type}-${p.color}`}
-                    type={p.type}
-                    color={p.color}
-                    position={[p.x, 0.05, p.z]}
-                />
-            ))}
+            {pieces.map((p) => {
+                const { x, z } = getSquareCoords(p.square);
+                return (
+                    <Piece
+                        key={p.id} // Stable ID for animation
+                        type={p.type}
+                        color={p.color}
+                        position={[x, 0.05, z]}
+                        isCaptured={p.isCaptured}
+                    />
+                );
+            })}
         </group>
     );
 };
