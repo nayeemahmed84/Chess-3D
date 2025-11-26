@@ -51,6 +51,31 @@ const Game = () => {
                     </span>
                 </div>
 
+                <button
+                    onClick={resetGame}
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: '100%',
+                        padding: '8px 12px',
+                        cursor: 'pointer',
+                        background: 'rgba(255, 255, 255, 0.1)',
+                        color: 'white',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        borderRadius: '8px',
+                        fontWeight: 500,
+                        fontSize: '14px',
+                        transition: 'all 0.2s ease',
+                        marginBottom: '12px' // Add margin to separate from Game Over or bottom
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
+                    onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+                >
+                    <RotateCcw size={14} style={{ marginRight: '8px' }} />
+                    Reset Game
+                </button>
+
                 {isGameOver && (
                     <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
                         <h3 style={{ margin: '0 0 8px 0', color: '#ff4d4d' }}>Game Over</h3>
