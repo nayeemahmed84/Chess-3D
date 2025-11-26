@@ -51,3 +51,16 @@ Contributions are welcome! Please fork the repository, create a feature branch, 
 
 ## License
 This project is licensed under the MIT License – see the [LICENSE](LICENSE) file for details.
+## Project Structure
+
+- `Unity/` – Unity project files for the 3D version.
+- `web/` – Vite‑based web version (JavaScript/HTML/CSS).
+- `README.md` – This documentation.
+- `package.json` – Node dependencies for the web version.
+
+## Technology Stack
+
+- **Unity 2022.3+** – 3D rendering, physics, and AI.
+- **Vite** – Fast dev server and bundler for the web version.
+- **Three.js** – 3D graphics in the browser.
+- **Node.js & npm** – Package management and script execution.
