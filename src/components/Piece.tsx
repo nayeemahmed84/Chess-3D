@@ -11,7 +11,7 @@ interface PieceProps {
 
 export const Piece = ({ type, color, position, isCaptured }: PieceProps) => {
     const isWhite = color === 'w';
-    const materialColor = isWhite ? '#ffffff' : '#4a4a4a'; // Lighter grey for smoked glass effect
+    const materialColor = isWhite ? '#ffffff' : '#555555'; // Lighter grey for smoked glass effect
 
     // ---- Geometry generation (unchanged) ----
     const points = useMemo(() => {
@@ -138,12 +138,12 @@ export const Piece = ({ type, color, position, isCaptured }: PieceProps) => {
                 <latheGeometry args={[points, 32]} />
                 <meshPhysicalMaterial
                     color={materialColor}
-                    roughness={0.05}
-                    metalness={0}
-                    transmission={0.85}
-                    thickness={1.5}
+                    roughness={0.02} // Smoother
+                    metalness={0.1} // Slight metallic hint for reflection
+                    transmission={0.95} // More transparent
+                    thickness={1.0} // Less dense
                     clearcoat={1}
-                    clearcoatRoughness={0.05}
+                    clearcoatRoughness={0.02}
                     ior={1.5}
                     reflectivity={0.9}
                 />
