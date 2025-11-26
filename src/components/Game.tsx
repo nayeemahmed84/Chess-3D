@@ -4,7 +4,7 @@ import { useChessGame } from '../hooks/useChessGame';
 import { RotateCcw } from 'lucide-react';
 
 const Game = () => {
-    const { makeMove, turn, isGameOver, winner, resetGame, getPossibleMoves, pieces } = useChessGame();
+    const { makeMove, turn, isGameOver, winner, resetGame, getPossibleMoves, pieces, difficulty, setDifficulty } = useChessGame();
 
     return (
         <div style={{ width: '100%', height: '100%', position: 'relative', background: '#1a1a1a' }}>
@@ -49,6 +49,29 @@ const Game = () => {
                     <span style={{ fontSize: '16px', fontWeight: 500 }}>
                         {turn === 'w' ? "White's Turn" : "Black's Turn"}
                     </span>
+                </div>
+
+                <div style={{ marginBottom: '16px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', color: 'rgba(255,255,255,0.6)', marginBottom: '4px' }}>Difficulty</label>
+                    <select
+                        value={difficulty}
+                        onChange={(e) => setDifficulty(e.target.value as any)}
+                        style={{
+                            width: '100%',
+                            padding: '8px',
+                            background: 'rgba(0, 0, 0, 0.3)',
+                            color: 'white',
+                            border: '1px solid rgba(255, 255, 255, 0.2)',
+                            borderRadius: '8px',
+                            outline: 'none',
+                            cursor: 'pointer',
+                            fontSize: '14px'
+                        }}
+                    >
+                        <option value="Easy">Easy</option>
+                        <option value="Medium">Medium</option>
+                        <option value="Hard">Hard</option>
+                    </select>
                 </div>
 
                 <button

@@ -9,6 +9,107 @@ export interface PieceState {
     isCaptured?: boolean;
 }
 
+export type Difficulty = 'Easy' | 'Medium' | 'Hard';
+
+const PIECE_VALUES: Record<string, number> = {
+    p: 1,
+    n: 3,
+    b: 3,
+    r: 5,
+    q: 9,
+    k: 0, // King value not needed for material sum usually, or set high
+};
+
+const evaluateBoard = (game: Chess): number => {
+    let score = 0;
+    const board = game.board();
+    for (const row of board) {
+        for (const piece of row) {
+            if (piece) {
+                const value = PIECE_VALUES[piece.type] || 0;
+                score += piece.color === 'b' ? value : -value;
+            }
+        }
+    }
+    return score;
+};
+
+const getBestMove = (game: Chess, difficulty: Difficulty): string | Move | null => {
+    const possibleMoves = game.moves({ verbose: true });
+    if (possibleMoves.length === 0) return null;
+
+    if (difficulty === 'Easy') {
+        return possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+    }
+
+    if (difficulty === 'Medium') {
+        // Prioritize captures
+        const captures = possibleMoves.filter(move => move.captured);
+        if (captures.length > 0) {
+            // Pick random capture for now, or maybe the one that captures highest value?
+            // Let's pick the one that captures the highest value piece
+            captures.sort((a, b) => {
+                const valA = PIECE_VALUES[a.captured || 'p'] || 0;
+                const valB = PIECE_VALUES[b.captured || 'p'] || 0;
+                return valB - valA;
+            });
+            return captures[0];
+        }
+        return possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+    }
+
+    if (difficulty === 'Hard') {
+        // Minimax depth 2
+        let bestMove = null;
+        let bestValue = -Infinity;
+
+        // We need to clone for simulation to not mess up the current game state passed in
+        // But game.move() mutates. We can undo().
+
+        for (const move of possibleMoves) {
+            game.move(move);
+            const boardValue = minimax(game, 1, false); // Depth 1 means we look at opponent's response
+            game.undo();
+
+            if (boardValue > bestValue) {
+                bestValue = boardValue;
+                bestMove = move;
+            }
+        }
+        return bestMove || possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+    }
+
+    return null;
+};
+
+const minimax = (game: Chess, depth: number, isMaximizingPlayer: boolean): number => {
+    if (depth === 0 || game.isGameOver()) {
+        return evaluateBoard(game);
+    }
+
+    const moves = game.moves();
+
+    if (isMaximizingPlayer) {
+        let maxEval = -Infinity;
+        for (const move of moves) {
+            game.move(move);
+            const evalScore = minimax(game, depth - 1, false);
+            game.undo();
+            maxEval = Math.max(maxEval, evalScore);
+        }
+        return maxEval;
+    } else {
+        let minEval = Infinity;
+        for (const move of moves) {
+            game.move(move);
+            const evalScore = minimax(game, depth - 1, true);
+            game.undo();
+            minEval = Math.min(minEval, evalScore);
+        }
+        return minEval;
+    }
+};
+
 export const useChessGame = () => {
     const [game, setGame] = useState(new Chess());
     const [fen, setFen] = useState(game.fen());
@@ -16,6 +117,7 @@ export const useChessGame = () => {
     const [isGameOver, setIsGameOver] = useState(false);
     const [winner, setWinner] = useState<string | null>(null);
     const [pieces, setPieces] = useState<PieceState[]>([]);
+    const [difficulty, setDifficulty] = useState<Difficulty>('Easy');
 
     // Audio assets
     const moveSoundUrl = 'https://assets.mixkit.co/sfx/preview/mixkit-quick-win-video-game-notification-269.wav';
@@ -156,12 +258,15 @@ export const useChessGame = () => {
     const makeAIMove = useCallback(() => {
         if (turn !== 'b' || isGameOver) return;
 
-        const possible = game.moves({ verbose: true });
-        if (possible.length === 0) return;
-        const randomMove = possible[Math.floor(Math.random() * possible.length)];
-
+        // Clone game for AI calculation
         const gameCopy = new Chess(game.fen());
-        const move = gameCopy.move(randomMove);
+
+        // Get best move based on difficulty
+        const bestMove = getBestMove(gameCopy, difficulty);
+
+        if (!bestMove) return;
+
+        const move = gameCopy.move(bestMove);
 
         if (move) {
             updatePieces(move);
@@ -180,7 +285,7 @@ export const useChessGame = () => {
                 }
             }
         }
-    }, [game, turn, isGameOver]);
+    }, [game, turn, isGameOver, difficulty]);
 
     useEffect(() => {
         if (turn === 'b' && !isGameOver) {
@@ -229,6 +334,8 @@ export const useChessGame = () => {
         isGameOver,
         winner,
         pieces,
+        difficulty,
+        setDifficulty,
         makeMove,
         resetGame,
         getPossibleMoves,
