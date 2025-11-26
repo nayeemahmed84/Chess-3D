@@ -11,7 +11,7 @@ interface PieceProps {
 
 export const Piece = ({ type, color, position, isCaptured }: PieceProps) => {
     const isWhite = color === 'w';
-    const materialColor = isWhite ? '#ffffff' : '#1a1a1a';
+    const materialColor = isWhite ? '#ffffff' : '#4a4a4a'; // Lighter grey for smoked glass effect
 
     // ---- Geometry generation (unchanged) ----
     const points = useMemo(() => {
