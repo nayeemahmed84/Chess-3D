@@ -13,7 +13,7 @@ A modern 3D chess experience built with Unity, featuring realistic graphics, gla
 ## Installation
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/Chess-game.git
+   git clone https://github.com/nayeemahmed84/Chess-3D.git
    ```
 2. Open the project in Unity (2022.3 or later).
 3. Resolve any package dependencies via the Unity Package Manager.
