@@ -2,6 +2,7 @@ import { Canvas } from '@react-three/fiber';
 import { Scene } from './Scene';
 import { useChessGame } from '../hooks/useChessGame';
 import { RotateCcw } from 'lucide-react';
+import { open } from '@tauri-apps/plugin-shell';
 
 const Game = () => {
     const { makeMove, turn, isGameOver, winner, resetGame, getPossibleMoves, pieces, difficulty, setDifficulty } = useChessGame();
@@ -138,7 +139,28 @@ const Game = () => {
                 fontSize: '12px',
                 fontFamily: 'monospace'
             }}>
-                Left Click to Select/Move • Right Click to Rotate
+                Made with 💖 by{' '}
+                <span
+                    onClick={async () => {
+                        try {
+                            console.log('Attempting to open URL...');
+                            await open('https://www.facebook.com/LegendCoder');
+                            console.log('URL opened successfully');
+                        } catch (error) {
+                            console.error('Error opening URL:', error);
+                            alert('Error opening link: ' + error);
+                        }
+                    }}
+                    style={{
+                        color: 'rgba(255,255,255,0.8)',
+                        cursor: 'pointer',
+                        textDecoration: 'underline'
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.color = 'rgba(255,255,255,1)'}
+                    onMouseOut={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.8)'}
+                >
+                    Nayeem
+                </span>
             </div>
         </div>
     );
