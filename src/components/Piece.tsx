@@ -72,6 +72,11 @@ export const Piece = ({ type, color, position, isCaptured }: PieceProps) => {
     const targetPos = useRef<Vector3>(new Vector3(...position));
     const progress = useRef(0);
     const animating = useRef(false);
+    const timeSinceCaptured = useRef(0); // Track capture animation time
+
+    // Capture animation state
+    const velocity = useRef(new Vector3(0, 0, 0));
+    const rotationAxis = useRef(new Vector3(Math.random(), Math.random(), Math.random()).normalize());
 
     // When the board position changes, start animation and trail
     useEffect(() => {
@@ -96,16 +101,57 @@ export const Piece = ({ type, color, position, isCaptured }: PieceProps) => {
         }
     }, [position]);
 
+    // Initialize capture velocity once
+    useEffect(() => {
+        if (isCaptured) {
+            // Initial upward velocity + random side velocity
+            velocity.current.set(
+                (Math.random() - 0.5) * 2, // Random X
+                5, // Initial Upward Force
+                (Math.random() - 0.5) * 2  // Random Z
+            );
+        }
+    }, [isCaptured]);
+
     // Frame loop: move piece and fade trail
     useFrame((_state, delta) => {
         // Handle capture animation
         if (isCaptured && meshRef.current) {
+            timeSinceCaptured.current += delta;
+            const t = timeSinceCaptured.current;
             const mat = meshRef.current.material as any;
-            // Fade out and scale down
-            mat.opacity = Math.max(0, mat.opacity - delta * 2);
-            mat.transparent = true;
-            const s = Math.max(0, meshRef.current.scale.x - delta * 2);
-            meshRef.current.scale.set(s, s, s);
+
+            // Phase 1: Flash Red (0s - 0.5s) - Smoother transition
+            if (t < 0.8) {
+                const red = new Color('#ff0000');
+                mat.color.lerp(red, delta * 5); // Slower lerp
+                mat.emissive = new Color('#ff0000');
+                mat.emissiveIntensity = Math.min(2, t * 4); // Ramp up intensity
+            }
+
+            // Phase 2: Physics-based Flight (Gravity)
+            if (t > 0.1) {
+                // Apply gravity
+                velocity.current.y -= delta * 8; // Gravity
+
+                // Apply velocity to position
+                meshRef.current.position.x += velocity.current.x * delta;
+                meshRef.current.position.y += velocity.current.y * delta;
+                meshRef.current.position.z += velocity.current.z * delta;
+
+                // Smooth Rotation
+                meshRef.current.rotateOnAxis(rotationAxis.current, delta * 5);
+            }
+
+            // Phase 3: Vanish (1.5s - 2.5s)
+            if (t > 1.5) {
+                mat.transparent = true;
+                const fadeProgress = (t - 1.5); // 0 to 1 over 1s
+                mat.opacity = Math.max(0, 1 - fadeProgress);
+                const s = Math.max(0, 1 - fadeProgress);
+                meshRef.current.scale.set(s, s, s);
+            }
+
             return;
         }
 
