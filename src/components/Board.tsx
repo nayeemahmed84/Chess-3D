@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Square } from 'chess.js';
+import { RoundedBox } from '@react-three/drei';
 import { Piece } from './Piece';
 import { PieceState } from '../hooks/useChessGame';
 
@@ -83,30 +84,61 @@ export const Board = ({ onMove, turn, getPossibleMoves, pieces }: BoardProps) =>
             </mesh>
 
             {/* Board Squares */}
-            {squares.map((sq) => (
-                <mesh
-                    key={sq.name}
-                    position={[sq.x, 0, sq.z]}
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        handleSquareClick(sq.name);
-                    }}
-                    receiveShadow
-                >
-                    <boxGeometry args={[1, 0.1, 1]} />
-                    <meshPhysicalMaterial
-                        color={
-                            selectedSquare === sq.name ? '#6a5acd' :
-                                possibleMoves.includes(sq.name) ? (sq.isBlack ? '#556b2f' : '#8fbc8f') :
-                                    sq.color
-                        }
-                        roughness={0.2}
-                        metalness={0.1}
-                        clearcoat={0.5}
-                        clearcoatRoughness={0.1}
-                    />
-                </mesh>
-            ))}
+            {squares.map((sq) => {
+                const isSelected = selectedSquare === sq.name;
+                const isPossibleMove = possibleMoves.includes(sq.name);
+
+                let color = sq.color;
+                let emissive = '#000000';
+                let emissiveIntensity = 0;
+                let height = 0.1;
+                let radius = 0; // No bevel by default
+                let smoothness = 1;
+
+                if (isPossibleMove) {
+                    // Darker blue for white squares to make it visible
+                    // Deep blue for black squares
+                    color = sq.isBlack ? '#003366' : '#0066cc';
+                    emissive = '#0088ff';
+                    emissiveIntensity = 0.6;
+
+                    // 3D Bevel/Emboss effect
+                    height = 0.12; // Slightly raised
+                    radius = 0.05; // Beveled edges
+                    smoothness = 4;
+                } else if (isSelected) {
+                    color = '#4488ff';
+                    emissive = '#4488ff';
+                    emissiveIntensity = 0.4;
+                    height = 0.11;
+                    radius = 0.02;
+                }
+
+                return (
+                    <RoundedBox
+                        key={sq.name}
+                        args={[1, height, 1]} // Width, Height, Depth
+                        radius={radius}
+                        smoothness={smoothness}
+                        position={[sq.x, (height - 0.1) / 2, sq.z]} // Adjust position to keep bottom aligned
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            handleSquareClick(sq.name);
+                        }}
+                        receiveShadow
+                    >
+                        <meshPhysicalMaterial
+                            color={color}
+                            emissive={emissive}
+                            emissiveIntensity={emissiveIntensity}
+                            roughness={isPossibleMove ? 0.1 : 0.2}
+                            metalness={isPossibleMove ? 0.3 : 0.1}
+                            clearcoat={0.5}
+                            clearcoatRoughness={0.1}
+                        />
+                    </RoundedBox>
+                );
+            })}
 
             {/* Pieces */}
             {pieces.map((p) => {
