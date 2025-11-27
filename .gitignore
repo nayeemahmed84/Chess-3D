@@ -44,3 +44,4 @@ Thumbs.db
 *.temp
 libs_*.txt
 
+compile_commands.txt
