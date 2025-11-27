@@ -1,1 +1,4 @@
 node_modules
+dist_electron
+dist
+src-tauri
