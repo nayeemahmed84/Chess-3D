@@ -8,10 +8,12 @@ interface BoardProps {
     onMove: (from: Square, to: Square) => boolean;
     turn: string;
     getPossibleMoves: (square: Square) => string[];
+    lastMove: { from: Square; to: Square } | null;
+    checkSquare: Square | null;
     pieces: PieceState[];
 }
 
-export const Board = ({ onMove, turn, getPossibleMoves, pieces }: BoardProps) => {
+export const Board = ({ onMove, turn, getPossibleMoves, pieces, lastMove, checkSquare }: BoardProps) => {
     const [selectedSquare, setSelectedSquare] = useState<Square | null>(null);
     const [possibleMoves, setPossibleMoves] = useState<string[]>([]);
 
@@ -87,6 +89,8 @@ export const Board = ({ onMove, turn, getPossibleMoves, pieces }: BoardProps) =>
             {squares.map((sq) => {
                 const isSelected = selectedSquare === sq.name;
                 const isPossibleMove = possibleMoves.includes(sq.name);
+                const isLastMove = lastMove && (lastMove.from === sq.name || lastMove.to === sq.name);
+                const isCheck = checkSquare === sq.name;
 
                 let color = sq.color;
                 let emissive = '#000000';
@@ -95,7 +99,11 @@ export const Board = ({ onMove, turn, getPossibleMoves, pieces }: BoardProps) =>
                 let radius = 0; // No bevel by default
                 let smoothness = 1;
 
-                if (isPossibleMove) {
+                if (isCheck) {
+                    color = '#ff3333';
+                    emissive = '#ff0000';
+                    emissiveIntensity = 0.5;
+                } else if (isPossibleMove) {
                     // Darker blue for white squares to make it visible
                     // Deep blue for black squares
                     color = sq.isBlack ? '#003366' : '#0066cc';
@@ -112,6 +120,16 @@ export const Board = ({ onMove, turn, getPossibleMoves, pieces }: BoardProps) =>
                     emissiveIntensity = 0.4;
                     height = 0.11;
                     radius = 0.02;
+                } else if (isLastMove) {
+                    // Dark purple transparent with bevel/emboss
+                    color = sq.isBlack ? '#4d1a66' : '#7733aa';
+                    emissive = '#9944dd';
+                    emissiveIntensity = 0.5;
+
+                    // 3D Bevel/Emboss effect (same as possible moves)
+                    height = 0.12; // Slightly raised
+                    radius = 0.05; // Beveled edges
+                    smoothness = 4;
                 }
 
                 return (

@@ -7,7 +7,8 @@ import { open } from '@tauri-apps/plugin-shell';
 const Game = () => {
     const {
         makeMove, turn, isGameOver, winner, resetGame, getPossibleMoves, pieces,
-        difficulty, setDifficulty, history, evaluation, whiteTime, blackTime, undoMove, redoMove
+        difficulty, setDifficulty, history, evaluation, whiteTime, blackTime, undoMove, redoMove,
+        promotionPending, onPromotionSelect, lastMove, checkSquare
     } = useChessGame();
 
     const formatTime = (seconds: number) => {
@@ -25,6 +26,8 @@ const Game = () => {
                     turn={turn}
                     getPossibleMoves={getPossibleMoves}
                     pieces={pieces}
+                    lastMove={lastMove}
+                    checkSquare={checkSquare}
                 />
             </Canvas>
 
@@ -264,6 +267,68 @@ const Game = () => {
                     {history.length === 0 && <div style={{ textAlign: 'center', opacity: 0.5, padding: '20px' }}>No moves yet</div>}
                 </div>
             </div>
+
+            {/* Promotion Modal - Centered on Screen */}
+            {promotionPending && (
+                <div style={{
+                    position: 'fixed',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    background: 'rgba(0, 0, 0, 0.6)',
+                    backdropFilter: 'blur(20px)',
+                    WebkitBackdropFilter: 'blur(20px)',
+                    padding: '30px',
+                    borderRadius: '20px',
+                    boxShadow: '0 20px 60px rgba(0, 0, 0, 0.8)',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    zIndex: 1000,
+                    textAlign: 'center'
+                }}>
+                    <h3 style={{ margin: '0 0 20px 0', color: '#fff', fontSize: '24px', fontWeight: 'bold' }}>Promote Pawn</h3>
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                        {[
+                            { type: 'q', symbol: '♛', color: 'linear-gradient(135deg, #FFD700, #FFA500)', name: 'Queen' },
+                            { type: 'r', symbol: '♜', color: 'linear-gradient(135deg, #4169E1, #1E90FF)', name: 'Rook' },
+                            { type: 'b', symbol: '♝', color: 'linear-gradient(135deg, #9370DB, #8A2BE2)', name: 'Bishop' },
+                            { type: 'n', symbol: '♞', color: 'linear-gradient(135deg, #32CD32, #228B22)', name: 'Knight' }
+                        ].map((piece) => (
+                            <button
+                                key={piece.type}
+                                onClick={() => onPromotionSelect(piece.type)}
+                                title={piece.name}
+                                style={{
+                                    padding: '0',
+                                    fontSize: '36px',
+                                    cursor: 'pointer',
+                                    background: piece.color,
+                                    border: '3px solid rgba(255, 255, 255, 0.3)',
+                                    borderRadius: '12px',
+                                    width: '70px',
+                                    height: '70px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    transition: 'all 0.2s',
+                                    boxShadow: '0 4px 15px rgba(0, 0, 0, 0.3)',
+                                    color: '#fff',
+                                    textShadow: '0 2px 4px rgba(0, 0, 0, 0.5)'
+                                }}
+                                onMouseOver={(e) => {
+                                    e.currentTarget.style.transform = 'scale(1.1)';
+                                    e.currentTarget.style.boxShadow = '0 6px 25px rgba(255, 255, 255, 0.3)';
+                                }}
+                                onMouseOut={(e) => {
+                                    e.currentTarget.style.transform = 'scale(1)';
+                                    e.currentTarget.style.boxShadow = '0 4px 15px rgba(0, 0, 0, 0.3)';
+                                }}
+                            >
+                                {piece.symbol}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             <div style={{
                 position: 'absolute',

@@ -122,6 +122,11 @@ export const useChessGame = () => {
     const [undoneMoves, setUndoneMoves] = useState<string[]>([]); // Stack for redo
     const [evaluation, setEvaluation] = useState(0);
 
+    // Gameplay improvements state
+    const [promotionPending, setPromotionPending] = useState<{ from: Square; to: Square; color: 'w' | 'b' } | null>(null);
+    const [lastMove, setLastMove] = useState<{ from: Square; to: Square } | null>(null);
+    const [checkSquare, setCheckSquare] = useState<Square | null>(null);
+
     // Timer state (in seconds) - Default 10 minutes
     const [whiteTime, setWhiteTime] = useState(600);
     const [blackTime, setBlackTime] = useState(600);
@@ -284,9 +289,21 @@ export const useChessGame = () => {
         }
     };
 
-    const makeMove = useCallback((from: Square, to: Square, promotion: string = 'q') => {
+    const makeMove = useCallback((from: Square, to: Square, promotion: string = 'q', isAI = false) => {
         try {
             const gameCopy = new Chess(game.fen());
+
+            // Check for promotion
+            const piece = gameCopy.get(from);
+            if (
+                !isAI &&
+                piece?.type === 'p' &&
+                ((piece.color === 'w' && to[1] === '8') || (piece.color === 'b' && to[1] === '1'))
+            ) {
+                setPromotionPending({ from, to, color: piece.color });
+                return false; // Wait for user selection
+            }
+
             const move = gameCopy.move({ from, to, promotion });
 
             if (move) {
@@ -298,6 +315,10 @@ export const useChessGame = () => {
                 setUndoneMoves([]); // Clear redo stack on new move
                 setEvaluation(evaluateBoard(gameCopy));
                 setTimerActive(true); // Start timer on first move
+
+                // Update visual hints
+                setLastMove({ from, to });
+                setCheckSquare(gameCopy.inCheck() ? gameCopy.board().flat().find(p => p?.type === 'k' && p.color === gameCopy.turn())?.square as Square : null);
 
                 handleMoveSound(move, gameCopy);
 
@@ -317,6 +338,13 @@ export const useChessGame = () => {
         }
         return false;
     }, [game]);
+
+    const onPromotionSelect = useCallback((pieceType: string) => {
+        if (promotionPending) {
+            makeMove(promotionPending.from, promotionPending.to, pieceType, true); // Treat as AI move to bypass check
+            setPromotionPending(null);
+        }
+    }, [promotionPending, makeMove]);
 
     const undoMove = useCallback(() => {
         const gameCopy = new Chess(game.fen());
@@ -417,6 +445,9 @@ export const useChessGame = () => {
         setHistory([]);
         setUndoneMoves([]);
         setEvaluation(0);
+        setLastMove(null);
+        setCheckSquare(null);
+        setPromotionPending(null);
         setWhiteTime(600);
         setBlackTime(600);
         setTimerActive(false);
@@ -456,8 +487,12 @@ export const useChessGame = () => {
         evaluation,
         whiteTime,
         blackTime,
+        promotionPending,
+        lastMove,
+        checkSquare,
         setDifficulty,
         makeMove,
+        onPromotionSelect,
         undoMove,
         redoMove,
         resetGame,

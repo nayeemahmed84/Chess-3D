@@ -9,9 +9,11 @@ interface SceneProps {
     turn: string;
     getPossibleMoves: (square: Square) => string[];
     pieces: PieceState[];
+    lastMove: { from: Square; to: Square } | null;
+    checkSquare: Square | null;
 }
 
-export const Scene = ({ onMove, turn, getPossibleMoves, pieces }: SceneProps) => {
+export const Scene = ({ onMove, turn, getPossibleMoves, pieces, lastMove, checkSquare }: SceneProps) => {
     return (
         <>
             <OrbitControls minPolarAngle={0} maxPolarAngle={Math.PI / 2.1} />
@@ -19,7 +21,14 @@ export const Scene = ({ onMove, turn, getPossibleMoves, pieces }: SceneProps) =>
             <pointLight position={[10, 10, 10]} intensity={1.5} castShadow />
             <Environment preset="forest" background blur={0.5} />
 
-            <Board onMove={onMove} turn={turn} getPossibleMoves={getPossibleMoves} pieces={pieces} />
+            <Board
+                onMove={onMove}
+                turn={turn}
+                getPossibleMoves={getPossibleMoves}
+                pieces={pieces}
+                lastMove={lastMove}
+                checkSquare={checkSquare}
+            />
         </>
     );
 };
