@@ -1,7 +1,7 @@
 import { Canvas } from '@react-three/fiber';
 import { Scene } from './Scene';
 import { useChessGame } from '../hooks/useChessGame';
-import { RotateCcw, RotateCw } from 'lucide-react';
+import { RotateCcw, RotateCw, Trophy } from 'lucide-react';
 
 import { open } from '@tauri-apps/plugin-shell';
 
@@ -204,35 +204,7 @@ const Game = () => {
                     Reset Game
                 </button>
 
-                {isGameOver && (
-                    <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                        <h3 style={{ margin: '0 0 8px 0', color: '#ff4d4d' }}>Game Over</h3>
-                        <p style={{ margin: '0 0 16px 0', fontSize: '14px', opacity: 0.8 }}>
-                            {winner === 'Draw' ? 'Draw' : `${winner} Wins!`}
-                        </p>
-                        <button
-                            onClick={resetGame}
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                width: '100%',
-                                padding: '10px 16px',
-                                cursor: 'pointer',
-                                background: 'rgba(255, 255, 255, 0.9)',
-                                color: '#000',
-                                border: 'none',
-                                borderRadius: '8px',
-                                fontWeight: 600,
-                                fontSize: '14px',
-                                transition: 'all 0.2s ease'
-                            }}
-                        >
-                            <RotateCcw size={16} style={{ marginRight: '8px' }} />
-                            Play Again
-                        </button>
-                    </div>
-                )}
+
             </div>
 
             {/* Right Panel - Move History */}
@@ -329,6 +301,90 @@ const Game = () => {
                                 {piece.symbol}
                             </button>
                         ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Game Over Modal */}
+            {isGameOver && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    background: 'rgba(0, 0, 0, 0.7)',
+                    backdropFilter: 'blur(8px)',
+                    zIndex: 2000,
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center'
+                }}>
+                    <div style={{
+                        background: 'rgba(20, 20, 20, 0.9)',
+                        backdropFilter: 'blur(20px)',
+                        padding: '50px 70px',
+                        borderRadius: '24px',
+                        border: '2px solid rgba(255, 255, 255, 0.15)',
+                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.8)',
+                        textAlign: 'center'
+                    }}>
+                        <Trophy size={80} style={{
+                            marginBottom: '20px',
+                            color: winner === 'Draw' ? '#AAA' : '#FFD700',
+                            filter: 'drop-shadow(0 0 20px rgba(255, 215, 0, 0.6))'
+                        }} />
+
+                        <h2 style={{
+                            fontSize: '48px',
+                            fontWeight: '800',
+                            margin: '0 0 10px 0',
+                            background: 'linear-gradient(135deg, #FFF 0%, #CCC 100%)',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                            letterSpacing: '-1px'
+                        }}>
+                            {winner === 'Draw' ? 'Draw!' : 'Victory!'}
+                        </h2>
+
+                        <p style={{
+                            fontSize: '24px',
+                            color: 'rgba(255, 255, 255, 0.8)',
+                            margin: '0 0 40px 0',
+                            fontWeight: '500'
+                        }}>
+                            {winner === 'Draw' ? 'Game ended in a draw' : `${winner} wins the game!`}
+                        </p>
+
+                        <button
+                            onClick={resetGame}
+                            onMouseOver={(e) => {
+                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                e.currentTarget.style.boxShadow = '0 12px 24px rgba(76, 175, 80, 0.4)';
+                            }}
+                            onMouseOut={(e) => {
+                                e.currentTarget.style.transform = 'translateY(0)';
+                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
+                            }}
+                            style={{
+                                background: 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)',
+                                color: 'white',
+                                border: 'none',
+                                padding: '18px 40px',
+                                fontSize: '18px',
+                                fontWeight: '600',
+                                borderRadius: '12px',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '12px',
+                                transition: 'all 0.2s ease',
+                                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
+                            }}
+                        >
+                            <RotateCcw size={20} />
+                            Play Again
+                        </button>
                     </div>
                 </div>
             )}
