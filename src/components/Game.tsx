@@ -1,7 +1,8 @@
 import { Canvas } from '@react-three/fiber';
 import { Scene } from './Scene';
 import { useChessGame } from '../hooks/useChessGame';
-import { RotateCcw } from 'lucide-react';
+import { RotateCcw, RotateCw } from 'lucide-react';
+
 import { open } from '@tauri-apps/plugin-shell';
 
 const Game = () => {
@@ -16,6 +17,8 @@ const Game = () => {
         const secs = seconds % 60;
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
+
+
 
     return (
         <div style={{ width: '100%', height: '100%', position: 'relative', background: '#1a1a1a' }}>
@@ -52,12 +55,12 @@ const Game = () => {
                     opacity: 0.2,
                     position: 'absolute'
                 }} />
-                {/* White bar height based on eval. Eval 0 = 50%. +10 = 100%, -10 = 0% */}
+                {/* White bar height based on eval. Eval 0 = 50%, ±20 = 0-100% */}
                 <div style={{
                     position: 'absolute',
                     bottom: 0,
                     width: '100%',
-                    height: `${Math.min(100, Math.max(0, 50 + (evaluation * 5)))}%`,
+                    height: `${Math.min(100, Math.max(0, 50 + (evaluation * 2.5)))}%`,
                     background: '#fff',
                     transition: 'height 0.5s ease'
                 }} />
@@ -160,7 +163,7 @@ const Game = () => {
                             display: 'flex', justifyContent: 'center', alignItems: 'center'
                         }}
                     >
-                        <RotateCcw size={14} style={{ transform: 'scaleX(-1)' }} />
+                        <RotateCcw size={14} />
                     </button>
                     <button
                         onClick={redoMove}
@@ -172,7 +175,7 @@ const Game = () => {
                             display: 'flex', justifyContent: 'center', alignItems: 'center'
                         }}
                     >
-                        <RotateCcw size={14} />
+                        <RotateCw size={14} />
                     </button>
                 </div>
 

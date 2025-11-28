@@ -291,7 +291,8 @@ export const useChessGame = () => {
 
     const makeMove = useCallback((from: Square, to: Square, promotion: string = 'q', isAI = false) => {
         try {
-            const gameCopy = new Chess(game.fen());
+            const gameCopy = new Chess();
+            gameCopy.loadPgn(game.pgn());
 
             // Check for promotion
             const piece = gameCopy.get(from);
@@ -347,22 +348,45 @@ export const useChessGame = () => {
     }, [promotionPending, makeMove]);
 
     const undoMove = useCallback(() => {
-        const gameCopy = new Chess(game.fen());
-        const move = gameCopy.undo();
-        if (move) {
+        console.log("Undo called. Current turn:", game.turn(), "History:", game.history().length);
+        const gameCopy = new Chess();
+        gameCopy.loadPgn(game.pgn()); // Use PGN to preserve history
+        const move1 = gameCopy.undo();
+        console.log("Undo 1 result:", move1);
+        let move2: Move | null = null;
+
+        if (move1) {
+            // If we just undid a Black move (AI), we must also undo White's move
+            if (move1.color === 'b') {
+                move2 = gameCopy.undo();
+                console.log("Undo 2 result (AI compensation):", move2);
+            }
+
             setGame(gameCopy);
             setFen(gameCopy.fen());
             setTurn(gameCopy.turn());
             setHistory(gameCopy.history());
-            setUndoneMoves(prev => [move.san, ...prev]); // Push to stack (simplification: store SAN, but for redo we might need more)
-            // Actually, for redo with chess.js, we just need to re-play the move string if it's unambiguous.
-            // Or better, store the whole PGN or just rely on re-playing moves?
-            // Simplest for now: Just store SAN.
+
+            setUndoneMoves(prev => {
+                const newMoves = [...prev];
+                if (move1) newMoves.unshift(move1.san);
+                if (move2) newMoves.unshift(move2.san);
+                return newMoves;
+            });
 
             setEvaluation(evaluateBoard(gameCopy));
-            syncPiecesWithBoard(gameCopy.board()); // Full sync for undo
+            syncPiecesWithBoard(gameCopy.board());
 
-            // If game was over, reset that
+            // Update visual hints
+            const hist = gameCopy.history({ verbose: true });
+            if (hist.length > 0) {
+                const lastHistMove = hist[hist.length - 1];
+                setLastMove({ from: lastHistMove.from, to: lastHistMove.to });
+            } else {
+                setLastMove(null);
+            }
+            setCheckSquare(gameCopy.inCheck() ? gameCopy.board().flat().find(p => p?.type === 'k' && p.color === gameCopy.turn())?.square as Square : null);
+
             if (isGameOver) {
                 setIsGameOver(false);
                 setWinner(null);
@@ -372,10 +396,13 @@ export const useChessGame = () => {
     }, [game, isGameOver]);
 
     const redoMove = useCallback(() => {
+        console.log("Redo called. Stack:", undoneMoves);
         if (undoneMoves.length === 0) return;
 
         const moveSan = undoneMoves[0];
-        const gameCopy = new Chess(game.fen());
+        console.log("Redoing move:", moveSan);
+        const gameCopy = new Chess();
+        gameCopy.loadPgn(game.pgn());
         const move = gameCopy.move(moveSan);
 
         if (move) {
@@ -394,7 +421,8 @@ export const useChessGame = () => {
         if (turn !== 'b' || isGameOver) return;
 
         // Clone game for AI calculation
-        const gameCopy = new Chess(game.fen());
+        const gameCopy = new Chess();
+        gameCopy.loadPgn(game.pgn());
 
         // Get best move based on difficulty
         const bestMove = getBestMove(gameCopy, difficulty);
