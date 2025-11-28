@@ -118,6 +118,14 @@ export const useChessGame = () => {
     const [winner, setWinner] = useState<string | null>(null);
     const [pieces, setPieces] = useState<PieceState[]>([]);
     const [difficulty, setDifficulty] = useState<Difficulty>('Easy');
+    const [history, setHistory] = useState<string[]>([]);
+    const [undoneMoves, setUndoneMoves] = useState<string[]>([]); // Stack for redo
+    const [evaluation, setEvaluation] = useState(0);
+
+    // Timer state (in seconds) - Default 10 minutes
+    const [whiteTime, setWhiteTime] = useState(600);
+    const [blackTime, setBlackTime] = useState(600);
+    const [timerActive, setTimerActive] = useState(false);
 
     // Audio assets
     const moveSoundUrl = 'https://assets.mixkit.co/sfx/preview/mixkit-quick-win-video-game-notification-269.wav';
@@ -149,7 +157,60 @@ export const useChessGame = () => {
             });
         });
         setPieces(initialPieces);
+        setEvaluation(evaluateBoard(game));
     }, []);
+
+    // Timer Logic
+    useEffect(() => {
+        let interval: ReturnType<typeof setInterval>;
+        if (timerActive && !isGameOver) {
+            interval = setInterval(() => {
+                if (turn === 'w') {
+                    setWhiteTime((prev) => {
+                        if (prev <= 0) {
+                            setIsGameOver(true);
+                            setWinner('Black');
+                            setTimerActive(false);
+                            return 0;
+                        }
+                        return prev - 1;
+                    });
+                } else {
+                    setBlackTime((prev) => {
+                        if (prev <= 0) {
+                            setIsGameOver(true);
+                            setWinner('White');
+                            setTimerActive(false);
+                            return 0;
+                        }
+                        return prev - 1;
+                    });
+                }
+            }, 1000);
+        }
+        return () => clearInterval(interval);
+    }, [timerActive, turn, isGameOver]);
+
+    // Update pieces helper (reused for move, undo, redo)
+    const syncPiecesWithBoard = (currentBoard: ReturnType<Chess['board']>) => {
+        setPieces(() => {
+            const newPieces: PieceState[] = [];
+            let idCounter = 0;
+            currentBoard.forEach((row) => {
+                row.forEach((piece) => {
+                    if (piece) {
+                        newPieces.push({
+                            id: `${piece.type}-${piece.color}-${idCounter++}`,
+                            type: piece.type,
+                            color: piece.color,
+                            square: piece.square,
+                        });
+                    }
+                });
+            });
+            return newPieces;
+        });
+    };
 
     const updatePieces = (move: Move) => {
         setPieces((prevPieces) => {
@@ -166,13 +227,10 @@ export const useChessGame = () => {
 
                 const capturedIndex = newPieces.findIndex(p => p.square === capturedSquare && !p.isCaptured);
                 if (capturedIndex !== -1) {
-                    // Mark as captured instead of removing immediately
                     newPieces[capturedIndex] = { ...newPieces[capturedIndex], isCaptured: true };
-
-                    // Schedule removal
                     setTimeout(() => {
                         setPieces(current => current.filter(p => p.id !== newPieces[capturedIndex].id));
-                    }, 500); // 500ms animation duration
+                    }, 500);
                 }
             }
 
@@ -236,11 +294,16 @@ export const useChessGame = () => {
                 setGame(gameCopy);
                 setFen(gameCopy.fen());
                 setTurn(gameCopy.turn());
+                setHistory(gameCopy.history());
+                setUndoneMoves([]); // Clear redo stack on new move
+                setEvaluation(evaluateBoard(gameCopy));
+                setTimerActive(true); // Start timer on first move
 
                 handleMoveSound(move, gameCopy);
 
                 if (gameCopy.isGameOver()) {
                     setIsGameOver(true);
+                    setTimerActive(false);
                     if (gameCopy.isCheckmate()) {
                         setWinner(gameCopy.turn() === 'w' ? 'Black' : 'White');
                     } else {
@@ -254,6 +317,50 @@ export const useChessGame = () => {
         }
         return false;
     }, [game]);
+
+    const undoMove = useCallback(() => {
+        const gameCopy = new Chess(game.fen());
+        const move = gameCopy.undo();
+        if (move) {
+            setGame(gameCopy);
+            setFen(gameCopy.fen());
+            setTurn(gameCopy.turn());
+            setHistory(gameCopy.history());
+            setUndoneMoves(prev => [move.san, ...prev]); // Push to stack (simplification: store SAN, but for redo we might need more)
+            // Actually, for redo with chess.js, we just need to re-play the move string if it's unambiguous.
+            // Or better, store the whole PGN or just rely on re-playing moves?
+            // Simplest for now: Just store SAN.
+
+            setEvaluation(evaluateBoard(gameCopy));
+            syncPiecesWithBoard(gameCopy.board()); // Full sync for undo
+
+            // If game was over, reset that
+            if (isGameOver) {
+                setIsGameOver(false);
+                setWinner(null);
+                setTimerActive(true);
+            }
+        }
+    }, [game, isGameOver]);
+
+    const redoMove = useCallback(() => {
+        if (undoneMoves.length === 0) return;
+
+        const moveSan = undoneMoves[0];
+        const gameCopy = new Chess(game.fen());
+        const move = gameCopy.move(moveSan);
+
+        if (move) {
+            setGame(gameCopy);
+            setFen(gameCopy.fen());
+            setTurn(gameCopy.turn());
+            setHistory(gameCopy.history());
+            setUndoneMoves(prev => prev.slice(1));
+            setEvaluation(evaluateBoard(gameCopy));
+            syncPiecesWithBoard(gameCopy.board()); // Full sync for redo
+            handleMoveSound(move, gameCopy);
+        }
+    }, [game, undoneMoves]);
 
     const makeAIMove = useCallback(() => {
         if (turn !== 'b' || isGameOver) return;
@@ -273,11 +380,15 @@ export const useChessGame = () => {
             setGame(gameCopy);
             setFen(gameCopy.fen());
             setTurn(gameCopy.turn());
+            setHistory(gameCopy.history());
+            setUndoneMoves([]);
+            setEvaluation(evaluateBoard(gameCopy));
 
             handleMoveSound(move, gameCopy);
 
             if (gameCopy.isGameOver()) {
                 setIsGameOver(true);
+                setTimerActive(false);
                 if (gameCopy.isCheckmate()) {
                     setWinner(gameCopy.turn() === 'w' ? 'Black' : 'White');
                 } else {
@@ -303,6 +414,12 @@ export const useChessGame = () => {
         setTurn(newGame.turn());
         setIsGameOver(false);
         setWinner(null);
+        setHistory([]);
+        setUndoneMoves([]);
+        setEvaluation(0);
+        setWhiteTime(600);
+        setBlackTime(600);
+        setTimerActive(false);
 
         const initialPieces: PieceState[] = [];
         const board = newGame.board();
@@ -335,8 +452,14 @@ export const useChessGame = () => {
         winner,
         pieces,
         difficulty,
+        history,
+        evaluation,
+        whiteTime,
+        blackTime,
         setDifficulty,
         makeMove,
+        undoMove,
+        redoMove,
         resetGame,
         getPossibleMoves,
     };

@@ -5,7 +5,16 @@ import { RotateCcw } from 'lucide-react';
 import { open } from '@tauri-apps/plugin-shell';
 
 const Game = () => {
-    const { makeMove, turn, isGameOver, winner, resetGame, getPossibleMoves, pieces, difficulty, setDifficulty } = useChessGame();
+    const {
+        makeMove, turn, isGameOver, winner, resetGame, getPossibleMoves, pieces,
+        difficulty, setDifficulty, history, evaluation, whiteTime, blackTime, undoMove, redoMove
+    } = useChessGame();
+
+    const formatTime = (seconds: number) => {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
 
     return (
         <div style={{ width: '100%', height: '100%', position: 'relative', background: '#1a1a1a' }}>
@@ -19,11 +28,52 @@ const Game = () => {
                 />
             </Canvas>
 
-            {/* Glassmorphism UI Overlay */}
+            {/* Evaluation Bar */}
+            <div style={{
+                position: 'absolute',
+                left: '20px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                width: '20px',
+                height: '60vh',
+                background: '#333',
+                borderRadius: '10px',
+                overflow: 'hidden',
+                border: '2px solid rgba(255,255,255,0.2)',
+                boxShadow: '0 0 20px rgba(0,0,0,0.5)'
+            }}>
+                <div style={{
+                    width: '100%',
+                    height: '100%',
+                    background: 'linear-gradient(to top, #000 0%, #fff 100%)',
+                    opacity: 0.2,
+                    position: 'absolute'
+                }} />
+                {/* White bar height based on eval. Eval 0 = 50%. +10 = 100%, -10 = 0% */}
+                <div style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    width: '100%',
+                    height: `${Math.min(100, Math.max(0, 50 + (evaluation * 5)))}%`,
+                    background: '#fff',
+                    transition: 'height 0.5s ease'
+                }} />
+                <div style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: 0,
+                    width: '100%',
+                    height: '2px',
+                    background: 'rgba(255,0,0,0.5)',
+                    zIndex: 10
+                }} />
+            </div>
+
+            {/* Glassmorphism UI Overlay - Left Panel (Controls) */}
             <div style={{
                 position: 'absolute',
                 top: 30,
-                left: 30,
+                left: 60,
                 color: 'white',
                 background: 'rgba(255, 255, 255, 0.1)',
                 backdropFilter: 'blur(10px)',
@@ -52,6 +102,26 @@ const Game = () => {
                     </span>
                 </div>
 
+                {/* Clocks */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', gap: '10px' }}>
+                    <div style={{
+                        background: turn === 'w' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)',
+                        padding: '8px', borderRadius: '8px', flex: 1, textAlign: 'center',
+                        border: turn === 'w' ? '1px solid rgba(255,255,255,0.5)' : '1px solid transparent'
+                    }}>
+                        <div style={{ fontSize: '10px', opacity: 0.7 }}>White</div>
+                        <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{formatTime(whiteTime)}</div>
+                    </div>
+                    <div style={{
+                        background: turn === 'b' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)',
+                        padding: '8px', borderRadius: '8px', flex: 1, textAlign: 'center',
+                        border: turn === 'b' ? '1px solid rgba(255,255,255,0.5)' : '1px solid transparent'
+                    }}>
+                        <div style={{ fontSize: '10px', opacity: 0.7 }}>Black</div>
+                        <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{formatTime(blackTime)}</div>
+                    </div>
+                </div>
+
                 <div style={{ marginBottom: '16px' }}>
                     <label style={{ display: 'block', fontSize: '12px', color: 'rgba(255,255,255,0.6)', marginBottom: '4px' }}>Difficulty</label>
                     <select
@@ -75,6 +145,34 @@ const Game = () => {
                     </select>
                 </div>
 
+                {/* Game Controls */}
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                    <button
+                        onClick={undoMove}
+                        title="Undo Move"
+                        style={{
+                            flex: 1, padding: '8px', cursor: 'pointer',
+                            background: 'rgba(255, 255, 255, 0.1)', color: 'white',
+                            border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: '8px',
+                            display: 'flex', justifyContent: 'center', alignItems: 'center'
+                        }}
+                    >
+                        <RotateCcw size={14} style={{ transform: 'scaleX(-1)' }} />
+                    </button>
+                    <button
+                        onClick={redoMove}
+                        title="Redo Move"
+                        style={{
+                            flex: 1, padding: '8px', cursor: 'pointer',
+                            background: 'rgba(255, 255, 255, 0.1)', color: 'white',
+                            border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: '8px',
+                            display: 'flex', justifyContent: 'center', alignItems: 'center'
+                        }}
+                    >
+                        <RotateCcw size={14} />
+                    </button>
+                </div>
+
                 <button
                     onClick={resetGame}
                     style={{
@@ -91,7 +189,7 @@ const Game = () => {
                         fontWeight: 500,
                         fontSize: '14px',
                         transition: 'all 0.2s ease',
-                        marginBottom: '12px' // Add margin to separate from Game Over or bottom
+                        marginBottom: '12px'
                     }}
                     onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
                     onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
@@ -129,6 +227,42 @@ const Game = () => {
                         </button>
                     </div>
                 )}
+            </div>
+
+            {/* Right Panel - Move History */}
+            <div style={{
+                position: 'absolute',
+                top: 30,
+                right: 30,
+                width: '200px',
+                maxHeight: '80vh',
+                color: 'white',
+                background: 'rgba(255, 255, 255, 0.1)',
+                backdropFilter: 'blur(10px)',
+                WebkitBackdropFilter: 'blur(10px)',
+                padding: '20px',
+                borderRadius: '16px',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.37)',
+                fontFamily: "'Inter', sans-serif",
+                display: 'flex',
+                flexDirection: 'column'
+            }}>
+                <h3 style={{ margin: '0 0 12px 0', fontSize: '16px', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '8px' }}>Move History</h3>
+                <div style={{ overflowY: 'auto', flex: 1, paddingRight: '5px' }}>
+                    <table style={{ width: '100%', fontSize: '14px', borderCollapse: 'collapse' }}>
+                        <tbody>
+                            {Array.from({ length: Math.ceil(history.length / 2) }).map((_, i) => (
+                                <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                    <td style={{ padding: '4px', color: 'rgba(255,255,255,0.5)', width: '30px' }}>{i + 1}.</td>
+                                    <td style={{ padding: '4px' }}>{history[i * 2]}</td>
+                                    <td style={{ padding: '4px' }}>{history[i * 2 + 1] || ''}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                    {history.length === 0 && <div style={{ textAlign: 'center', opacity: 0.5, padding: '20px' }}>No moves yet</div>}
+                </div>
             </div>
 
             <div style={{
