@@ -27,7 +27,7 @@ const evaluateBoard = (game: Chess): number => {
         for (const piece of row) {
             if (piece) {
                 const value = PIECE_VALUES[piece.type] || 0;
-                score += piece.color === 'b' ? value : -value;
+                score += piece.color === 'w' ? value : -value;
             }
         }
     }
