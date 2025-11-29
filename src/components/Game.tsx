@@ -1,7 +1,8 @@
+import { useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { Scene } from './Scene';
 import { useChessGame } from '../hooks/useChessGame';
-import { RotateCcw, RotateCw, Trophy } from 'lucide-react';
+import { RotateCcw, RotateCw, Trophy, ChevronLeft, ChevronRight } from 'lucide-react';
 
 import { open } from '@tauri-apps/plugin-shell';
 
@@ -11,6 +12,8 @@ const Game = () => {
         difficulty, setDifficulty, history, evaluation, whiteTime, blackTime, undoMove, redoMove,
         promotionPending, onPromotionSelect, lastMove, checkSquare, playerColor, setPlayerColor
     } = useChessGame();
+
+    const [isPanelVisible, setIsPanelVisible] = useState(true);
 
     const formatTime = (seconds: number) => {
         const mins = Math.floor(seconds / 60);
@@ -76,11 +79,47 @@ const Game = () => {
                 }} />
             </div>
 
+            {/* Floating Show Panel Button (when hidden) */}
+            {!isPanelVisible && (
+                <button
+                    onClick={() => setIsPanelVisible(true)}
+                    style={{
+                        position: 'absolute',
+                        top: 30,
+                        left: 20,
+                        background: 'rgba(255, 255, 255, 0.1)',
+                        backdropFilter: 'blur(10px)',
+                        WebkitBackdropFilter: 'blur(10px)',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        borderRadius: '8px',
+                        padding: '8px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.2s',
+                        zIndex: 100,
+                        boxShadow: '0 4px 16px 0 rgba(0, 0, 0, 0.37)'
+                    }}
+                    onMouseOver={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                        e.currentTarget.style.transform = 'scale(1.05)';
+                    }}
+                    onMouseOut={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                        e.currentTarget.style.transform = 'scale(1)';
+                    }}
+                    title="Show Panel"
+                >
+                    <ChevronRight size={20} color="white" />
+                </button>
+            )}
+
             {/* Glassmorphism UI Overlay - Left Panel (Controls) */}
             <div style={{
                 position: 'absolute',
                 top: 30,
-                left: 60,
+                left: isPanelVisible ? 60 : -300,
                 color: 'white',
                 background: 'rgba(255, 255, 255, 0.1)',
                 backdropFilter: 'blur(10px)',
@@ -90,8 +129,37 @@ const Game = () => {
                 border: '1px solid rgba(255, 255, 255, 0.2)',
                 boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.37)',
                 fontFamily: "'Inter', sans-serif",
-                minWidth: '200px'
+                minWidth: '200px',
+                transition: 'left 0.3s ease',
+                zIndex: 100
             }}>
+                {/* Toggle Button */}
+                <button
+                    onClick={() => setIsPanelVisible(!isPanelVisible)}
+                    style={{
+                        position: 'absolute',
+                        top: '12px',
+                        right: '12px',
+                        background: 'rgba(255, 255, 255, 0.1)',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        borderRadius: '6px',
+                        padding: '4px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.2s',
+                    }}
+                    onMouseOver={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                    }}
+                    onMouseOut={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                    }}
+                    title="Hide Panel"
+                >
+                    <ChevronLeft size={16} />
+                </button>
                 <h2 style={{ margin: '0 0 16px 0', fontSize: '24px', fontWeight: 600, letterSpacing: '-0.5px' }}>Chess 3D</h2>
 
                 <div style={{ display: 'flex', alignItems: 'center', marginBottom: '12px' }}>
