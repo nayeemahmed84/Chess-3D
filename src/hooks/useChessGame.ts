@@ -34,81 +34,7 @@ const evaluateBoard = (game: Chess): number => {
     return score;
 };
 
-const getBestMove = (game: Chess, difficulty: Difficulty): string | Move | null => {
-    const possibleMoves = game.moves({ verbose: true });
-    if (possibleMoves.length === 0) return null;
 
-    if (difficulty === 'Easy') {
-        return possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
-    }
-
-    if (difficulty === 'Medium') {
-        // Prioritize captures
-        const captures = possibleMoves.filter(move => move.captured);
-        if (captures.length > 0) {
-            // Pick random capture for now, or maybe the one that captures highest value?
-            // Let's pick the one that captures the highest value piece
-            captures.sort((a, b) => {
-                const valA = PIECE_VALUES[a.captured || 'p'] || 0;
-                const valB = PIECE_VALUES[b.captured || 'p'] || 0;
-                return valB - valA;
-            });
-            return captures[0];
-        }
-        return possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
-    }
-
-    if (difficulty === 'Hard') {
-        // Minimax depth 2
-        let bestMove = null;
-        let bestValue = -Infinity;
-
-        // We need to clone for simulation to not mess up the current game state passed in
-        // But game.move() mutates. We can undo().
-
-        for (const move of possibleMoves) {
-            game.move(move);
-            const boardValue = minimax(game, 1, false); // Depth 1 means we look at opponent's response
-            game.undo();
-
-            if (boardValue > bestValue) {
-                bestValue = boardValue;
-                bestMove = move;
-            }
-        }
-        return bestMove || possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
-    }
-
-    return null;
-};
-
-const minimax = (game: Chess, depth: number, isMaximizingPlayer: boolean): number => {
-    if (depth === 0 || game.isGameOver()) {
-        return evaluateBoard(game);
-    }
-
-    const moves = game.moves();
-
-    if (isMaximizingPlayer) {
-        let maxEval = -Infinity;
-        for (const move of moves) {
-            game.move(move);
-            const evalScore = minimax(game, depth - 1, false);
-            game.undo();
-            maxEval = Math.max(maxEval, evalScore);
-        }
-        return maxEval;
-    } else {
-        let minEval = Infinity;
-        for (const move of moves) {
-            game.move(move);
-            const evalScore = minimax(game, depth - 1, true);
-            game.undo();
-            minEval = Math.min(minEval, evalScore);
-        }
-        return minEval;
-    }
-};
 
 export const useChessGame = () => {
     const [game, setGame] = useState(new Chess());
@@ -131,6 +57,17 @@ export const useChessGame = () => {
     const [whiteTime, setWhiteTime] = useState(600);
     const [blackTime, setBlackTime] = useState(600);
     const [timerActive, setTimerActive] = useState(false);
+
+    // Play as Black state
+    const [playerColor, setPlayerColor] = useState<'w' | 'b'>('w');
+    const [worker, setWorker] = useState<Worker | null>(null);
+
+    // Initialize Web Worker
+    useEffect(() => {
+        const newWorker = new Worker(new URL('../workers/ai.worker.ts', import.meta.url), { type: 'module' });
+        setWorker(newWorker);
+        return () => newWorker.terminate();
+    }, []);
 
     // Audio assets
     const moveSoundUrl = 'https://assets.mixkit.co/sfx/preview/mixkit-quick-win-video-game-notification-269.wav';
@@ -350,14 +287,14 @@ export const useChessGame = () => {
     const undoMove = useCallback(() => {
         console.log("Undo called. Current turn:", game.turn(), "History:", game.history().length);
         const gameCopy = new Chess();
-        gameCopy.loadPgn(game.pgn()); // Use PGN to preserve history
+        gameCopy.loadPgn(game.pgn());
         const move1 = gameCopy.undo();
         console.log("Undo 1 result:", move1);
         let move2: Move | null = null;
 
         if (move1) {
-            // If we just undid a Black move (AI), we must also undo White's move
-            if (move1.color === 'b') {
+            // If we just undid an AI move, we must also undo Player's move
+            if (move1.color !== playerColor) {
                 move2 = gameCopy.undo();
                 console.log("Undo 2 result (AI compensation):", move2);
             }
@@ -393,7 +330,7 @@ export const useChessGame = () => {
                 setTimerActive(true);
             }
         }
-    }, [game, isGameOver]);
+    }, [game, isGameOver, playerColor]);
 
     const redoMove = useCallback(() => {
         console.log("Redo called. Stack:", undoneMoves);
@@ -406,62 +343,66 @@ export const useChessGame = () => {
         const move = gameCopy.move(moveSan);
 
         if (move) {
+            // Double redo logic
+            if (move.color === playerColor && undoneMoves.length > 1) {
+                const nextMoveSan = undoneMoves[1];
+                const move2 = gameCopy.move(nextMoveSan);
+                if (move2) {
+                    setUndoneMoves(prev => prev.slice(2));
+                } else {
+                    setUndoneMoves(prev => prev.slice(1));
+                }
+            } else {
+                setUndoneMoves(prev => prev.slice(1));
+            }
+
             setGame(gameCopy);
             setFen(gameCopy.fen());
             setTurn(gameCopy.turn());
             setHistory(gameCopy.history());
-            setUndoneMoves(prev => prev.slice(1));
             setEvaluation(evaluateBoard(gameCopy));
-            syncPiecesWithBoard(gameCopy.board()); // Full sync for redo
+            syncPiecesWithBoard(gameCopy.board());
             handleMoveSound(move, gameCopy);
         }
-    }, [game, undoneMoves]);
+    }, [game, undoneMoves, playerColor]);
 
     const makeAIMove = useCallback(() => {
-        if (turn !== 'b' || isGameOver) return;
+        if (game.turn() === playerColor || isGameOver || !worker) return;
 
-        // Clone game for AI calculation
-        const gameCopy = new Chess();
-        gameCopy.loadPgn(game.pgn());
+        // Post message to worker
+        worker.postMessage({
+            fen: game.fen(),
+            pgn: game.pgn(),
+            difficulty
+        });
 
-        // Get best move based on difficulty
-        const bestMove = getBestMove(gameCopy, difficulty);
-
-        if (!bestMove) return;
-
-        const move = gameCopy.move(bestMove);
-
-        if (move) {
-            updatePieces(move);
-            setGame(gameCopy);
-            setFen(gameCopy.fen());
-            setTurn(gameCopy.turn());
-            setHistory(gameCopy.history());
-            setUndoneMoves([]);
-            setEvaluation(evaluateBoard(gameCopy));
-
-            handleMoveSound(move, gameCopy);
-
-            if (gameCopy.isGameOver()) {
-                setIsGameOver(true);
-                setTimerActive(false);
-                if (gameCopy.isCheckmate()) {
-                    setWinner(gameCopy.turn() === 'w' ? 'Black' : 'White');
-                } else {
-                    setWinner('Draw');
+        // Handle response
+        worker.onmessage = (e) => {
+            const bestMove = e.data;
+            if (bestMove) {
+                if (typeof bestMove === 'object') {
+                    makeMove(bestMove.from, bestMove.to, bestMove.promotion || 'q', true);
+                } else if (typeof bestMove === 'string') {
+                    const move = game.move(bestMove);
+                    game.undo();
+                    if (move) {
+                        makeMove(move.from, move.to, move.promotion, true);
+                    }
                 }
             }
-        }
-    }, [game, turn, isGameOver, difficulty]);
+        };
+    }, [game, playerColor, isGameOver, worker, difficulty, makeMove]);
 
+    // AI Move Effect - White always moves first (standard chess)
     useEffect(() => {
-        if (turn === 'b' && !isGameOver) {
-            const timer = setTimeout(() => {
-                makeAIMove();
-            }, 1000);
+        const isAITurn = !isGameOver && game.turn() !== playerColor;
+        const canAIMove = game.history().length > 0 || (playerColor === 'b' && game.history().length === 0);
+
+        if (isAITurn && canAIMove) {
+            const timer = setTimeout(makeAIMove, 500);
             return () => clearTimeout(timer);
         }
-    }, [turn, isGameOver, makeAIMove]);
+    }, [game, isGameOver, playerColor, makeAIMove]);
 
     const resetGame = useCallback(() => {
         const newGame = new Chess();
@@ -525,5 +466,7 @@ export const useChessGame = () => {
         redoMove,
         resetGame,
         getPossibleMoves,
+        playerColor,
+        setPlayerColor,
     };
 };

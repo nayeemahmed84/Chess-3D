@@ -1,6 +1,8 @@
 import { OrbitControls, Environment } from '@react-three/drei';
 import { Board } from './Board';
 import { Square } from 'chess.js';
+import { useThree } from '@react-three/fiber';
+import { useEffect } from 'react';
 
 import { PieceState } from '../hooks/useChessGame';
 
@@ -11,11 +13,27 @@ interface SceneProps {
     pieces: PieceState[];
     lastMove: { from: Square; to: Square } | null;
     checkSquare: Square | null;
+    playerColor: 'w' | 'b';
 }
 
-export const Scene = ({ onMove, turn, getPossibleMoves, pieces, lastMove, checkSquare }: SceneProps) => {
+const CameraController = ({ playerColor }: { playerColor: 'w' | 'b' }) => {
+    const { camera } = useThree();
+    useEffect(() => {
+        if (playerColor === 'b') {
+            camera.position.set(0, 8, -8);
+            camera.lookAt(0, 0, 0);
+        } else {
+            camera.position.set(0, 8, 8);
+            camera.lookAt(0, 0, 0);
+        }
+    }, [playerColor, camera]);
+    return null;
+};
+
+export const Scene = ({ onMove, turn, getPossibleMoves, pieces, lastMove, checkSquare, playerColor }: SceneProps) => {
     return (
         <>
+            <CameraController playerColor={playerColor} />
             <OrbitControls minPolarAngle={0} maxPolarAngle={Math.PI / 2.1} />
             <ambientLight intensity={0.2} />
             <pointLight position={[10, 10, 10]} intensity={1.5} castShadow />

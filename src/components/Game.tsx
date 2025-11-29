@@ -9,7 +9,7 @@ const Game = () => {
     const {
         makeMove, turn, isGameOver, winner, resetGame, getPossibleMoves, pieces,
         difficulty, setDifficulty, history, evaluation, whiteTime, blackTime, undoMove, redoMove,
-        promotionPending, onPromotionSelect, lastMove, checkSquare
+        promotionPending, onPromotionSelect, lastMove, checkSquare, playerColor, setPlayerColor
     } = useChessGame();
 
     const formatTime = (seconds: number) => {
@@ -31,6 +31,7 @@ const Game = () => {
                     pieces={pieces}
                     lastMove={lastMove}
                     checkSquare={checkSquare}
+                    playerColor={playerColor}
                 />
             </Canvas>
 
@@ -149,6 +150,42 @@ const Game = () => {
                         <option value="Medium">Medium</option>
                         <option value="Hard">Hard</option>
                     </select>
+                </div>
+
+                <div style={{ marginBottom: '16px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', color: 'rgba(255,255,255,0.6)', marginBottom: '4px' }}>Play As</label>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                            onClick={() => setPlayerColor('w')}
+                            style={{
+                                flex: 1,
+                                padding: '8px',
+                                background: playerColor === 'w' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)',
+                                color: 'white',
+                                border: '1px solid rgba(255, 255, 255, 0.2)',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                fontSize: '14px'
+                            }}
+                        >
+                            White
+                        </button>
+                        <button
+                            onClick={() => setPlayerColor('b')}
+                            style={{
+                                flex: 1,
+                                padding: '8px',
+                                background: playerColor === 'b' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)',
+                                color: 'white',
+                                border: '1px solid rgba(255, 255, 255, 0.2)',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                fontSize: '14px'
+                            }}
+                        >
+                            Black
+                        </button>
+                    </div>
                 </div>
 
                 {/* Game Controls */}
