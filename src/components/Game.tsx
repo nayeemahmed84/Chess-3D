@@ -213,7 +213,7 @@ const Game = () => {
                 top: 30,
                 right: 30,
                 width: '200px',
-                maxHeight: '80vh',
+                maxHeight: '200px',
                 color: 'white',
                 background: 'rgba(255, 255, 255, 0.1)',
                 backdropFilter: 'blur(10px)',
@@ -227,7 +227,7 @@ const Game = () => {
                 flexDirection: 'column'
             }}>
                 <h3 style={{ margin: '0 0 12px 0', fontSize: '16px', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '8px' }}>Move History</h3>
-                <div style={{ overflowY: 'auto', flex: 1, paddingRight: '5px' }}>
+                <div className="glass-scrollbar" style={{ overflowY: 'auto', flex: 1, paddingRight: '5px' }}>
                     <table style={{ width: '100%', fontSize: '14px', borderCollapse: 'collapse' }}>
                         <tbody>
                             {Array.from({ length: Math.ceil(history.length / 2) }).map((_, i) => (
