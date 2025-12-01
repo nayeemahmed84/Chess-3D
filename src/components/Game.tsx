@@ -6,6 +6,32 @@ import { RotateCcw, RotateCw, Trophy, ChevronLeft, ChevronRight, Volume2, Volume
 
 import { open } from '@tauri-apps/plugin-shell';
 
+// CSS Keyframe Animations
+const animationStyles = `
+@keyframes victoryBounce {
+    0%, 100% { transform: translateY(0) scale(1); }
+    25% { transform: translateY(-20px) scale(1.1); }
+    50% { transform: translateY(0) scale(1); }
+    75% { transform: translateY(-10px) scale(1.05); }
+}
+
+@keyframes victoryPulse {
+    0%, 100% { filter: drop-shadow(0 0 20px rgba(255, 215, 0, 0.6)); }
+    50% { filter: drop-shadow(0 0 40px rgba(255, 215, 0, 1)); }
+}
+
+@keyframes drawFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-15px); }
+}
+
+@keyframes lossShake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+    20%, 40%, 60%, 80% { transform: translateX(5px); }
+}
+`;
+
 const Game = () => {
     const {
         makeMove, turn, isGameOver, winner, resetGame, getPossibleMoves, pieces,
@@ -554,10 +580,17 @@ const Game = () => {
                             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.8)',
                             textAlign: 'center'
                         }}>
+                            {/* Inject CSS animations */}
+                            <style>{animationStyles}</style>
+
                             <Trophy size={80} style={{
                                 marginBottom: '20px',
                                 color: winner === 'Draw' ? '#AAA' : '#FFD700',
-                                filter: 'drop-shadow(0 0 20px rgba(255, 215, 0, 0.6))'
+                                animation: winner === 'Draw'
+                                    ? 'drawFloat 3s ease-in-out infinite'
+                                    : winner === 'White' || winner === 'Black' // Assuming winner is 'White' or 'Black' for victory
+                                        ? 'victoryBounce 2s ease-in-out infinite, victoryPulse 2s ease-in-out infinite'
+                                        : 'lossShake 0.5s ease-in-out infinite' // Fallback or specific loss condition if needed
                             }} />
 
                             <h2 style={{

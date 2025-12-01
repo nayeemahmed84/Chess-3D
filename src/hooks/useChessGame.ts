@@ -61,7 +61,7 @@ export const useChessGame = () => {
     const [attackedSquares, setAttackedSquares] = useState<Square[]>([]);
 
     // Volume state
-    const [volume, setVolume] = useState(0.5);
+    const [volume, setVolume] = useState(1);
     const [isMuted, setIsMuted] = useState(false);
 
     // Timer state (in seconds) - Default 10 minutes
