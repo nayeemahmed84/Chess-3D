@@ -105,30 +105,38 @@ export const useChessGame = () => {
     // Timer Logic
     useEffect(() => {
         let interval: ReturnType<typeof setInterval>;
+        let lastTime = Date.now();
+
         if (timerActive && !isGameOver) {
             interval = setInterval(() => {
+                const now = Date.now();
+                const delta = (now - lastTime) / 1000;
+                lastTime = now;
+
                 if (turn === 'w') {
                     setWhiteTime((prev) => {
-                        if (prev <= 0) {
+                        const newVal = prev - delta;
+                        if (newVal <= 0) {
                             setIsGameOver(true);
                             setWinner('Black');
                             setTimerActive(false);
                             return 0;
                         }
-                        return prev - 1;
+                        return newVal;
                     });
                 } else {
                     setBlackTime((prev) => {
-                        if (prev <= 0) {
+                        const newVal = prev - delta;
+                        if (newVal <= 0) {
                             setIsGameOver(true);
                             setWinner('White');
                             setTimerActive(false);
                             return 0;
                         }
-                        return prev - 1;
+                        return newVal;
                     });
                 }
-            }, 1000);
+            }, 100);
         }
         return () => clearInterval(interval);
     }, [timerActive, turn, isGameOver]);
@@ -249,6 +257,7 @@ export const useChessGame = () => {
                 setGame(gameCopy);
                 setFen(gameCopy.fen());
                 setTurn(gameCopy.turn());
+                console.log("[MakeMove] Turn changed to:", gameCopy.turn());
                 setHistory(gameCopy.history());
                 setUndoneMoves([]); // Clear redo stack on new move
                 setEvaluation(evaluateBoard(gameCopy));
