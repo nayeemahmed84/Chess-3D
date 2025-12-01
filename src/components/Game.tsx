@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { Scene } from './Scene';
 import { useChessGame } from '../hooks/useChessGame';
-import { RotateCcw, RotateCw, Trophy, ChevronLeft, ChevronRight } from 'lucide-react';
+import { RotateCcw, RotateCw, Trophy, ChevronLeft, ChevronRight, Volume2, VolumeX } from 'lucide-react';
 
 import { open } from '@tauri-apps/plugin-shell';
 
@@ -11,7 +11,8 @@ const Game = () => {
         makeMove, turn, isGameOver, winner, resetGame, getPossibleMoves, pieces,
         difficulty, setDifficulty, history, evaluation, whiteTime, blackTime, undoMove, redoMove,
         promotionPending, onPromotionSelect, lastMove, checkSquare, playerColor, setPlayerColor,
-        hintMove, showHint, showThreats, setShowThreats, attackedSquares, requestHint
+        hintMove, showHint, showThreats, setShowThreats, attackedSquares, requestHint,
+        volume, setVolume, isMuted, toggleMute
     } = useChessGame();
 
     const [isPanelVisible, setIsPanelVisible] = useState(true);
@@ -221,6 +222,43 @@ const Game = () => {
                         <option value="Medium">Medium</option>
                         <option value="Hard">Hard</option>
                     </select>
+                </div>
+
+                <div style={{ marginBottom: '16px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', color: 'rgba(255,255,255,0.6)', marginBottom: '4px' }}>Volume</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <button
+                            onClick={toggleMute}
+                            style={{
+                                background: 'none',
+                                border: 'none',
+                                color: 'white',
+                                cursor: 'pointer',
+                                padding: '4px',
+                                display: 'flex',
+                                alignItems: 'center'
+                            }}
+                            title={isMuted ? "Unmute" : "Mute"}
+                        >
+                            {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+                        </button>
+                        <input
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.01"
+                            value={isMuted ? 0 : volume}
+                            onChange={(e) => {
+                                if (isMuted) toggleMute();
+                                setVolume(parseFloat(e.target.value));
+                            }}
+                            style={{
+                                flex: 1,
+                                cursor: 'pointer',
+                                accentColor: '#4CAF50'
+                            }}
+                        />
+                    </div>
                 </div>
 
                 <div style={{ marginBottom: '16px' }}>

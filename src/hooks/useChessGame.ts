@@ -60,6 +60,10 @@ export const useChessGame = () => {
     const [showThreats, setShowThreats] = useState(false);
     const [attackedSquares, setAttackedSquares] = useState<Square[]>([]);
 
+    // Volume state
+    const [volume, setVolume] = useState(0.5);
+    const [isMuted, setIsMuted] = useState(false);
+
     // Timer state (in seconds) - Default 10 minutes
     const [whiteTime, setWhiteTime] = useState(600);
     const [blackTime, setBlackTime] = useState(600);
@@ -79,10 +83,15 @@ export const useChessGame = () => {
     // Audio assets are imported at the top of the file
 
     const playSound = (url: string) => {
+        if (isMuted) return;
         const audio = new Audio(url);
-        audio.volume = 0.5;
+        audio.volume = volume;
         audio.play().catch(() => { });
     };
+
+    const toggleMute = useCallback(() => {
+        setIsMuted(prev => !prev);
+    }, []);
 
     // Initialize pieces with stable IDs
     useEffect(() => {
@@ -556,5 +565,9 @@ export const useChessGame = () => {
         setShowThreats,
         attackedSquares,
         requestHint,
+        volume,
+        setVolume,
+        isMuted,
+        toggleMute,
     };
 };
