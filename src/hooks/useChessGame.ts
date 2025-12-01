@@ -324,7 +324,7 @@ export const useChessGame = () => {
 
     // Auto-update hint when game state changes or showHint is toggled
     useEffect(() => {
-        if (showHint && !isGameOver && worker) {
+        if (showHint && !isGameOver && worker && game.turn() === playerColor) {
             worker.postMessage({
                 fen: game.fen(),
                 pgn: game.pgn(),
@@ -334,7 +334,7 @@ export const useChessGame = () => {
         } else {
             setHintMove(null);
         }
-    }, [showHint, game, isGameOver, worker]);
+    }, [showHint, game, isGameOver, worker, playerColor]);
 
     const onPromotionSelect = useCallback((pieceType: string) => {
         if (promotionPending) {
