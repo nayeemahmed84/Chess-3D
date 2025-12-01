@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { Scene } from './Scene';
 import { useChessGame } from '../hooks/useChessGame';
@@ -63,6 +63,90 @@ const Game = () => {
         const secs = Math.floor(seconds % 60);
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
+
+    // Keyboard shortcuts
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Don't trigger shortcuts if user is typing in an input or if modals are open
+            const target = e.target as HTMLElement;
+            if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
+                return;
+            }
+
+            // Escape key - close modals
+            if (e.key === 'Escape') {
+                if (notification) {
+                    setNotification(null);
+                    return;
+                }
+            }
+
+            // Don't allow other shortcuts during promotion or when modals are open
+            if (promotionPending || notification) {
+                return;
+            }
+
+            switch (e.key.toLowerCase()) {
+                case 'arrowleft':
+                    e.preventDefault();
+                    undoMove();
+                    break;
+                case 'arrowright':
+                    e.preventDefault();
+                    redoMove();
+                    break;
+                case 'h':
+                    e.preventDefault();
+                    requestHint();
+                    break;
+                case 'r':
+                    e.preventDefault();
+                    resetGame();
+                    break;
+                case 's':
+                    e.preventDefault();
+                    if (saveGame()) {
+                        setNotification({
+                            type: 'success',
+                            message: 'Game Saved Successfully!'
+                        });
+                        setTimeout(() => setNotification(null), 2000);
+                    }
+                    break;
+                case 'l':
+                    e.preventDefault();
+                    if (hasSavedGame) {
+                        setNotification({
+                            type: 'confirm',
+                            message: 'Load saved game? Current progress will be lost.',
+                            onConfirm: () => {
+                                if (loadGame()) {
+                                    setNotification({
+                                        type: 'success',
+                                        message: 'Game Loaded Successfully!'
+                                    });
+                                    setTimeout(() => setNotification(null), 2000);
+                                } else {
+                                    setNotification({
+                                        type: 'error',
+                                        message: 'Failed to load game.'
+                                    });
+                                    setTimeout(() => setNotification(null), 2000);
+                                }
+                            }
+                        });
+                    }
+                    break;
+                case 't':
+                    e.preventDefault();
+                    setShowThreats(!showThreats);
+                    break;
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [undoMove, redoMove, requestHint, resetGame, saveGame, loadGame, hasSavedGame, showThreats, setShowThreats, promotionPending, notification]);
 
 
 
