@@ -10,7 +10,8 @@ const Game = () => {
     const {
         makeMove, turn, isGameOver, winner, resetGame, getPossibleMoves, pieces,
         difficulty, setDifficulty, history, evaluation, whiteTime, blackTime, undoMove, redoMove,
-        promotionPending, onPromotionSelect, lastMove, checkSquare, playerColor, setPlayerColor
+        promotionPending, onPromotionSelect, lastMove, checkSquare, playerColor, setPlayerColor,
+        hintMove, showThreats, setShowThreats, attackedSquares, requestHint
     } = useChessGame();
 
     const [isPanelVisible, setIsPanelVisible] = useState(true);
@@ -35,6 +36,8 @@ const Game = () => {
                     lastMove={lastMove}
                     checkSquare={checkSquare}
                     playerColor={playerColor}
+                    hintMove={hintMove}
+                    attackedSquares={attackedSquares}
                 />
             </Canvas>
 
@@ -281,6 +284,38 @@ const Game = () => {
                         }}
                     >
                         <RotateCw size={14} />
+                    </button>
+                </div>
+
+                {/* Hint & Analysis Controls */}
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                    <button
+                        onClick={requestHint}
+                        title="Get a Hint"
+                        style={{
+                            flex: 1, padding: '8px', cursor: 'pointer',
+                            background: 'rgba(255, 215, 0, 0.2)', color: '#FFD700',
+                            border: '1px solid rgba(255, 215, 0, 0.4)', borderRadius: '8px',
+                            display: 'flex', justifyContent: 'center', alignItems: 'center',
+                            fontSize: '14px', fontWeight: 600
+                        }}
+                    >
+                        💡 Hint
+                    </button>
+                    <button
+                        onClick={() => setShowThreats(!showThreats)}
+                        title="Toggle Threat Indicators"
+                        style={{
+                            flex: 1, padding: '8px', cursor: 'pointer',
+                            background: showThreats ? 'rgba(255, 50, 50, 0.3)' : 'rgba(255, 255, 255, 0.1)',
+                            color: showThreats ? '#ffaaaa' : 'white',
+                            border: showThreats ? '1px solid rgba(255, 50, 50, 0.5)' : '1px solid rgba(255, 255, 255, 0.2)',
+                            borderRadius: '8px',
+                            display: 'flex', justifyContent: 'center', alignItems: 'center',
+                            fontSize: '14px'
+                        }}
+                    >
+                        {showThreats ? 'Hide Threats' : 'Show Threats'}
                     </button>
                 </div>
 

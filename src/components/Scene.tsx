@@ -14,6 +14,8 @@ interface SceneProps {
     lastMove: { from: Square; to: Square } | null;
     checkSquare: Square | null;
     playerColor: 'w' | 'b';
+    hintMove: { from: Square; to: Square } | null;
+    attackedSquares: Square[];
 }
 
 const CameraController = ({ playerColor }: { playerColor: 'w' | 'b' }) => {
@@ -30,7 +32,7 @@ const CameraController = ({ playerColor }: { playerColor: 'w' | 'b' }) => {
     return null;
 };
 
-export const Scene = ({ onMove, turn, getPossibleMoves, pieces, lastMove, checkSquare, playerColor }: SceneProps) => {
+export const Scene = ({ onMove, turn, getPossibleMoves, pieces, lastMove, checkSquare, playerColor, hintMove, attackedSquares }: SceneProps) => {
     return (
         <>
             <CameraController playerColor={playerColor} />
@@ -46,6 +48,8 @@ export const Scene = ({ onMove, turn, getPossibleMoves, pieces, lastMove, checkS
                 pieces={pieces}
                 lastMove={lastMove}
                 checkSquare={checkSquare}
+                hintMove={hintMove}
+                attackedSquares={attackedSquares}
             />
         </>
     );

@@ -111,17 +111,13 @@ const getBestMove = (game: Chess, difficulty: Difficulty): string | Move | null 
 };
 
 self.onmessage = (e: MessageEvent) => {
-    const { fen, difficulty } = e.data;
-    const game = new Chess(fen); // Note: History lost here, but fine for AI calculation usually (except 3-fold)
-    // If we want 3-fold repetition detection in AI, we need history.
-    // But sending full history to worker is easy.
-    // Let's accept PGN?
-    // e.data.pgn
+    const { fen, difficulty, type } = e.data;
+    const game = new Chess(fen);
 
     if (e.data.pgn) {
         game.loadPgn(e.data.pgn);
     }
 
     const bestMove = getBestMove(game, difficulty);
-    self.postMessage(bestMove);
+    self.postMessage({ type, move: bestMove });
 };

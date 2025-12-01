@@ -52,6 +52,9 @@ export const useChessGame = () => {
     const [promotionPending, setPromotionPending] = useState<{ from: Square; to: Square; color: 'w' | 'b' } | null>(null);
     const [lastMove, setLastMove] = useState<{ from: Square; to: Square } | null>(null);
     const [checkSquare, setCheckSquare] = useState<Square | null>(null);
+    const [hintMove, setHintMove] = useState<{ from: Square; to: Square } | null>(null);
+    const [showThreats, setShowThreats] = useState(false);
+    const [attackedSquares, setAttackedSquares] = useState<Square[]>([]);
 
     // Timer state (in seconds) - Default 10 minutes
     const [whiteTime, setWhiteTime] = useState(600);
@@ -286,6 +289,46 @@ export const useChessGame = () => {
         return false;
     }, [game]);
 
+    // Calculate attacked squares whenever game state changes or showThreats changes
+    useEffect(() => {
+        if (!showThreats) {
+            setAttackedSquares([]);
+            return;
+        }
+
+        const squares: Square[] = [];
+        const opponentColor = game.turn() === 'w' ? 'b' : 'w';
+
+        // Iterate over all squares to check if they are attacked by opponent
+        const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+        for (let rank = 1; rank <= 8; rank++) {
+            for (const file of files) {
+                const square = `${file}${rank}` as Square;
+                try {
+                    // @ts-ignore
+                    if (game.isAttacked(square, opponentColor)) {
+                        squares.push(square);
+                    }
+                } catch (e) {
+                    // Fallback or ignore if method doesn't exist
+                }
+            }
+        }
+        setAttackedSquares(squares);
+    }, [game, showThreats, fen]);
+
+    const requestHint = useCallback(() => {
+        if (isGameOver || !worker) return;
+
+        // Use 'Hard' difficulty for best hint
+        worker.postMessage({
+            fen: game.fen(),
+            pgn: game.pgn(),
+            difficulty: 'Hard',
+            type: 'hint'
+        });
+    }, [game, isGameOver, worker]);
+
     const onPromotionSelect = useCallback((pieceType: string) => {
         if (promotionPending) {
             makeMove(promotionPending.from, promotionPending.to, pieceType, true); // Treat as AI move to bypass check
@@ -382,20 +425,43 @@ export const useChessGame = () => {
         worker.postMessage({
             fen: game.fen(),
             pgn: game.pgn(),
-            difficulty
+            difficulty,
+            type: 'move'
         });
 
         // Handle response
         worker.onmessage = (e) => {
-            const bestMove = e.data;
-            if (bestMove) {
-                if (typeof bestMove === 'object') {
-                    makeMove(bestMove.from, bestMove.to, bestMove.promotion || 'q', true);
-                } else if (typeof bestMove === 'string') {
-                    const move = game.move(bestMove);
-                    game.undo();
-                    if (move) {
-                        makeMove(move.from, move.to, move.promotion, true);
+            const { type, move: bestMove } = e.data;
+
+            if (type === 'hint') {
+                if (bestMove) {
+                    if (typeof bestMove === 'object') {
+                        setHintMove({ from: bestMove.from, to: bestMove.to });
+                    } else if (typeof bestMove === 'string') {
+                        // Parse SAN string if needed, but worker usually returns move object or string
+                        // If string, we need to find from/to. 
+                        // Ideally worker returns Move object. 
+                        // Let's assume it returns object or we handle string via game.move() dry run
+                        const tempGame = new Chess(game.fen());
+                        const m = tempGame.move(bestMove);
+                        if (m) {
+                            setHintMove({ from: m.from, to: m.to });
+                        }
+                    }
+                }
+                return;
+            }
+
+            if (type === 'move') {
+                if (bestMove) {
+                    if (typeof bestMove === 'object') {
+                        makeMove(bestMove.from, bestMove.to, bestMove.promotion || 'q', true);
+                    } else if (typeof bestMove === 'string') {
+                        const move = game.move(bestMove);
+                        game.undo();
+                        if (move) {
+                            makeMove(move.from, move.to, move.promotion, true);
+                        }
                     }
                 }
             }
@@ -425,6 +491,7 @@ export const useChessGame = () => {
         setEvaluation(0);
         setLastMove(null);
         setCheckSquare(null);
+        setHintMove(null);
         setPromotionPending(null);
         setWhiteTime(600);
         setBlackTime(600);
@@ -477,5 +544,10 @@ export const useChessGame = () => {
         getPossibleMoves,
         playerColor,
         setPlayerColor,
+        hintMove,
+        showThreats,
+        setShowThreats,
+        attackedSquares,
+        requestHint,
     };
 };
