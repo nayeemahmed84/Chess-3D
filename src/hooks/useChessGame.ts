@@ -53,6 +53,7 @@ export const useChessGame = () => {
     const [lastMove, setLastMove] = useState<{ from: Square; to: Square } | null>(null);
     const [checkSquare, setCheckSquare] = useState<Square | null>(null);
     const [hintMove, setHintMove] = useState<{ from: Square; to: Square } | null>(null);
+    const [showHint, setShowHint] = useState(false);
     const [showThreats, setShowThreats] = useState(false);
     const [attackedSquares, setAttackedSquares] = useState<Square[]>([]);
 
@@ -318,16 +319,22 @@ export const useChessGame = () => {
     }, [game, showThreats, fen]);
 
     const requestHint = useCallback(() => {
-        if (isGameOver || !worker) return;
+        setShowHint(prev => !prev);
+    }, []);
 
-        // Use 'Hard' difficulty for best hint
-        worker.postMessage({
-            fen: game.fen(),
-            pgn: game.pgn(),
-            difficulty: 'Hard',
-            type: 'hint'
-        });
-    }, [game, isGameOver, worker]);
+    // Auto-update hint when game state changes or showHint is toggled
+    useEffect(() => {
+        if (showHint && !isGameOver && worker) {
+            worker.postMessage({
+                fen: game.fen(),
+                pgn: game.pgn(),
+                difficulty: 'Hard',
+                type: 'hint'
+            });
+        } else {
+            setHintMove(null);
+        }
+    }, [showHint, game, isGameOver, worker]);
 
     const onPromotionSelect = useCallback((pieceType: string) => {
         if (promotionPending) {
@@ -545,6 +552,7 @@ export const useChessGame = () => {
         playerColor,
         setPlayerColor,
         hintMove,
+        showHint,
         showThreats,
         setShowThreats,
         attackedSquares,

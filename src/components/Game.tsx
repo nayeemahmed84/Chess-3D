@@ -11,7 +11,7 @@ const Game = () => {
         makeMove, turn, isGameOver, winner, resetGame, getPossibleMoves, pieces,
         difficulty, setDifficulty, history, evaluation, whiteTime, blackTime, undoMove, redoMove,
         promotionPending, onPromotionSelect, lastMove, checkSquare, playerColor, setPlayerColor,
-        hintMove, showThreats, setShowThreats, attackedSquares, requestHint
+        hintMove, showHint, showThreats, setShowThreats, attackedSquares, requestHint
     } = useChessGame();
 
     const [isPanelVisible, setIsPanelVisible] = useState(true);
@@ -294,13 +294,16 @@ const Game = () => {
                         title="Get a Hint"
                         style={{
                             flex: 1, padding: '8px', cursor: 'pointer',
-                            background: 'rgba(255, 215, 0, 0.2)', color: '#FFD700',
-                            border: '1px solid rgba(255, 215, 0, 0.4)', borderRadius: '8px',
+                            background: showHint ? 'rgba(255, 215, 0, 0.5)' : 'rgba(255, 215, 0, 0.2)',
+                            color: '#FFD700',
+                            border: showHint ? '1px solid rgba(255, 215, 0, 0.8)' : '1px solid rgba(255, 215, 0, 0.4)',
+                            borderRadius: '8px',
                             display: 'flex', justifyContent: 'center', alignItems: 'center',
-                            fontSize: '14px', fontWeight: 600
+                            fontSize: '14px', fontWeight: 600,
+                            boxShadow: showHint ? '0 0 10px rgba(255, 215, 0, 0.3)' : 'none'
                         }}
                     >
-                        💡 Hint
+                        {showHint ? 'Hide Hint' : '💡 Hint'}
                     </button>
                     <button
                         onClick={() => setShowThreats(!showThreats)}
@@ -384,150 +387,154 @@ const Game = () => {
             </div>
 
             {/* Promotion Modal - Centered on Screen */}
-            {promotionPending && (
-                <div style={{
-                    position: 'fixed',
-                    top: '50%',
-                    left: '50%',
-                    transform: 'translate(-50%, -50%)',
-                    background: 'rgba(0, 0, 0, 0.6)',
-                    backdropFilter: 'blur(20px)',
-                    WebkitBackdropFilter: 'blur(20px)',
-                    padding: '30px',
-                    borderRadius: '20px',
-                    boxShadow: '0 20px 60px rgba(0, 0, 0, 0.8)',
-                    border: '1px solid rgba(255, 255, 255, 0.2)',
-                    zIndex: 1000,
-                    textAlign: 'center'
-                }}>
-                    <h3 style={{ margin: '0 0 20px 0', color: '#fff', fontSize: '24px', fontWeight: 'bold' }}>Promote Pawn</h3>
-                    <div style={{ display: 'flex', gap: '12px' }}>
-                        {[
-                            { type: 'q', symbol: '♛', color: 'linear-gradient(135deg, #FFD700, #FFA500)', name: 'Queen' },
-                            { type: 'r', symbol: '♜', color: 'linear-gradient(135deg, #4169E1, #1E90FF)', name: 'Rook' },
-                            { type: 'b', symbol: '♝', color: 'linear-gradient(135deg, #9370DB, #8A2BE2)', name: 'Bishop' },
-                            { type: 'n', symbol: '♞', color: 'linear-gradient(135deg, #32CD32, #228B22)', name: 'Knight' }
-                        ].map((piece) => (
-                            <button
-                                key={piece.type}
-                                onClick={() => onPromotionSelect(piece.type)}
-                                title={piece.name}
-                                style={{
-                                    padding: '0',
-                                    fontSize: '36px',
-                                    cursor: 'pointer',
-                                    background: piece.color,
-                                    border: '3px solid rgba(255, 255, 255, 0.3)',
-                                    borderRadius: '12px',
-                                    width: '70px',
-                                    height: '70px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    transition: 'all 0.2s',
-                                    boxShadow: '0 4px 15px rgba(0, 0, 0, 0.3)',
-                                    color: '#fff',
-                                    textShadow: '0 2px 4px rgba(0, 0, 0, 0.5)'
-                                }}
-                                onMouseOver={(e) => {
-                                    e.currentTarget.style.transform = 'scale(1.1)';
-                                    e.currentTarget.style.boxShadow = '0 6px 25px rgba(255, 255, 255, 0.3)';
-                                }}
-                                onMouseOut={(e) => {
-                                    e.currentTarget.style.transform = 'scale(1)';
-                                    e.currentTarget.style.boxShadow = '0 4px 15px rgba(0, 0, 0, 0.3)';
-                                }}
-                            >
-                                {piece.symbol}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {/* Game Over Modal */}
-            {isGameOver && (
-                <div style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    height: '100%',
-                    background: 'rgba(0, 0, 0, 0.7)',
-                    backdropFilter: 'blur(8px)',
-                    zIndex: 2000,
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center'
-                }}>
+            {
+                promotionPending && (
                     <div style={{
-                        background: 'rgba(20, 20, 20, 0.9)',
+                        position: 'fixed',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        background: 'rgba(0, 0, 0, 0.6)',
                         backdropFilter: 'blur(20px)',
-                        padding: '50px 70px',
-                        borderRadius: '24px',
-                        border: '2px solid rgba(255, 255, 255, 0.15)',
-                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.8)',
+                        WebkitBackdropFilter: 'blur(20px)',
+                        padding: '30px',
+                        borderRadius: '20px',
+                        boxShadow: '0 20px 60px rgba(0, 0, 0, 0.8)',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        zIndex: 1000,
                         textAlign: 'center'
                     }}>
-                        <Trophy size={80} style={{
-                            marginBottom: '20px',
-                            color: winner === 'Draw' ? '#AAA' : '#FFD700',
-                            filter: 'drop-shadow(0 0 20px rgba(255, 215, 0, 0.6))'
-                        }} />
-
-                        <h2 style={{
-                            fontSize: '48px',
-                            fontWeight: '800',
-                            margin: '0 0 10px 0',
-                            background: 'linear-gradient(135deg, #FFF 0%, #CCC 100%)',
-                            WebkitBackgroundClip: 'text',
-                            WebkitTextFillColor: 'transparent',
-                            letterSpacing: '-1px'
-                        }}>
-                            {winner === 'Draw' ? 'Draw!' : 'Victory!'}
-                        </h2>
-
-                        <p style={{
-                            fontSize: '24px',
-                            color: 'rgba(255, 255, 255, 0.8)',
-                            margin: '0 0 40px 0',
-                            fontWeight: '500'
-                        }}>
-                            {winner === 'Draw' ? 'Game ended in a draw' : `${winner} wins the game!`}
-                        </p>
-
-                        <button
-                            onClick={resetGame}
-                            onMouseOver={(e) => {
-                                e.currentTarget.style.transform = 'translateY(-2px)';
-                                e.currentTarget.style.boxShadow = '0 12px 24px rgba(76, 175, 80, 0.4)';
-                            }}
-                            onMouseOut={(e) => {
-                                e.currentTarget.style.transform = 'translateY(0)';
-                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
-                            }}
-                            style={{
-                                background: 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)',
-                                color: 'white',
-                                border: 'none',
-                                padding: '18px 40px',
-                                fontSize: '18px',
-                                fontWeight: '600',
-                                borderRadius: '12px',
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '12px',
-                                transition: 'all 0.2s ease',
-                                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
-                            }}
-                        >
-                            <RotateCcw size={20} />
-                            Play Again
-                        </button>
+                        <h3 style={{ margin: '0 0 20px 0', color: '#fff', fontSize: '24px', fontWeight: 'bold' }}>Promote Pawn</h3>
+                        <div style={{ display: 'flex', gap: '12px' }}>
+                            {[
+                                { type: 'q', symbol: '♛', color: 'linear-gradient(135deg, #FFD700, #FFA500)', name: 'Queen' },
+                                { type: 'r', symbol: '♜', color: 'linear-gradient(135deg, #4169E1, #1E90FF)', name: 'Rook' },
+                                { type: 'b', symbol: '♝', color: 'linear-gradient(135deg, #9370DB, #8A2BE2)', name: 'Bishop' },
+                                { type: 'n', symbol: '♞', color: 'linear-gradient(135deg, #32CD32, #228B22)', name: 'Knight' }
+                            ].map((piece) => (
+                                <button
+                                    key={piece.type}
+                                    onClick={() => onPromotionSelect(piece.type)}
+                                    title={piece.name}
+                                    style={{
+                                        padding: '0',
+                                        fontSize: '36px',
+                                        cursor: 'pointer',
+                                        background: piece.color,
+                                        border: '3px solid rgba(255, 255, 255, 0.3)',
+                                        borderRadius: '12px',
+                                        width: '70px',
+                                        height: '70px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        transition: 'all 0.2s',
+                                        boxShadow: '0 4px 15px rgba(0, 0, 0, 0.3)',
+                                        color: '#fff',
+                                        textShadow: '0 2px 4px rgba(0, 0, 0, 0.5)'
+                                    }}
+                                    onMouseOver={(e) => {
+                                        e.currentTarget.style.transform = 'scale(1.1)';
+                                        e.currentTarget.style.boxShadow = '0 6px 25px rgba(255, 255, 255, 0.3)';
+                                    }}
+                                    onMouseOut={(e) => {
+                                        e.currentTarget.style.transform = 'scale(1)';
+                                        e.currentTarget.style.boxShadow = '0 4px 15px rgba(0, 0, 0, 0.3)';
+                                    }}
+                                >
+                                    {piece.symbol}
+                                </button>
+                            ))}
+                        </div>
                     </div>
-                </div>
-            )}
+                )
+            }
+
+            {/* Game Over Modal */}
+            {
+                isGameOver && (
+                    <div style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%',
+                        background: 'rgba(0, 0, 0, 0.7)',
+                        backdropFilter: 'blur(8px)',
+                        zIndex: 2000,
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center'
+                    }}>
+                        <div style={{
+                            background: 'rgba(20, 20, 20, 0.9)',
+                            backdropFilter: 'blur(20px)',
+                            padding: '50px 70px',
+                            borderRadius: '24px',
+                            border: '2px solid rgba(255, 255, 255, 0.15)',
+                            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.8)',
+                            textAlign: 'center'
+                        }}>
+                            <Trophy size={80} style={{
+                                marginBottom: '20px',
+                                color: winner === 'Draw' ? '#AAA' : '#FFD700',
+                                filter: 'drop-shadow(0 0 20px rgba(255, 215, 0, 0.6))'
+                            }} />
+
+                            <h2 style={{
+                                fontSize: '48px',
+                                fontWeight: '800',
+                                margin: '0 0 10px 0',
+                                background: 'linear-gradient(135deg, #FFF 0%, #CCC 100%)',
+                                WebkitBackgroundClip: 'text',
+                                WebkitTextFillColor: 'transparent',
+                                letterSpacing: '-1px'
+                            }}>
+                                {winner === 'Draw' ? 'Draw!' : 'Victory!'}
+                            </h2>
+
+                            <p style={{
+                                fontSize: '24px',
+                                color: 'rgba(255, 255, 255, 0.8)',
+                                margin: '0 0 40px 0',
+                                fontWeight: '500'
+                            }}>
+                                {winner === 'Draw' ? 'Game ended in a draw' : `${winner} wins the game!`}
+                            </p>
+
+                            <button
+                                onClick={resetGame}
+                                onMouseOver={(e) => {
+                                    e.currentTarget.style.transform = 'translateY(-2px)';
+                                    e.currentTarget.style.boxShadow = '0 12px 24px rgba(76, 175, 80, 0.4)';
+                                }}
+                                onMouseOut={(e) => {
+                                    e.currentTarget.style.transform = 'translateY(0)';
+                                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
+                                }}
+                                style={{
+                                    background: 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)',
+                                    color: 'white',
+                                    border: 'none',
+                                    padding: '18px 40px',
+                                    fontSize: '18px',
+                                    fontWeight: '600',
+                                    borderRadius: '12px',
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '12px',
+                                    transition: 'all 0.2s ease',
+                                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
+                                }}
+                            >
+                                <RotateCcw size={20} />
+                                Play Again
+                            </button>
+                        </div>
+                    </div>
+                )
+            }
 
             <div style={{
                 position: 'absolute',
@@ -560,7 +567,7 @@ const Game = () => {
                     Nayeem
                 </span>
             </div>
-        </div>
+        </div >
     );
 };
 
