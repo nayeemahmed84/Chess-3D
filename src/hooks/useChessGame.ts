@@ -1,5 +1,8 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Chess, Square, Move } from 'chess.js';
+import moveSoundUrl from '../assets/sounds/move.mp3';
+import captureSoundUrl from '../assets/sounds/capture.mp3';
+import checkmateSoundUrl from '../assets/sounds/checkmate.mp3';
 
 export interface PieceState {
     id: string;
@@ -73,11 +76,7 @@ export const useChessGame = () => {
         return () => newWorker.terminate();
     }, []);
 
-    // Audio assets
-    const moveSoundUrl = 'https://assets.mixkit.co/sfx/preview/mixkit-quick-win-video-game-notification-269.wav';
-    const captureSoundUrl = 'https://assets.mixkit.co/sfx/preview/mixkit-arcade-game-jump-coin-226.wav';
-    const checkmateSoundUrl = 'https://assets.mixkit.co/sfx/preview/mixkit-arcade-game-over-213.wav';
-    const checkSoundUrl = 'https://assets.mixkit.co/sfx/preview/mixkit-game-notification-wave-alarm-987.wav';
+    // Audio assets are imported at the top of the file
 
     const playSound = (url: string) => {
         const audio = new Audio(url);
@@ -230,7 +229,7 @@ export const useChessGame = () => {
         if (newGame.isCheckmate()) {
             playSound(checkmateSoundUrl);
         } else if (newGame.isCheck()) {
-            playSound(checkSoundUrl);
+            playSound(moveSoundUrl); // Using move sound for check
         } else if (move.captured) {
             playSound(captureSoundUrl);
         } else {
