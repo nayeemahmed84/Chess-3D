@@ -14,6 +14,23 @@ export interface PieceState {
 
 export type Difficulty = 'Easy' | 'Medium' | 'Hard';
 
+interface SavedGame {
+    fen: string;
+    pgn: string; // To restore history properly
+    turn: 'w' | 'b';
+    isGameOver: boolean;
+    winner: string | null;
+    difficulty: Difficulty;
+    history: string[];
+    undoneMoves: string[];
+    evaluation: number;
+    whiteTime: number;
+    blackTime: number;
+    playerColor: 'w' | 'b';
+    volume: number;
+    isMuted: boolean;
+}
+
 const PIECE_VALUES: Record<string, number> = {
     p: 1,
     n: 3,
@@ -59,6 +76,7 @@ export const useChessGame = () => {
     const [showHint, setShowHint] = useState(false);
     const [showThreats, setShowThreats] = useState(false);
     const [attackedSquares, setAttackedSquares] = useState<Square[]>([]);
+    const [hasSavedGame, setHasSavedGame] = useState(false);
 
     // Volume state
     const [volume, setVolume] = useState(1);
@@ -112,6 +130,12 @@ export const useChessGame = () => {
         });
         setPieces(initialPieces);
         setEvaluation(evaluateBoard(game));
+
+        // Check for saved game on mount
+        const savedData = localStorage.getItem('chess_saved_game');
+        if (savedData) {
+            setHasSavedGame(true);
+        }
     }, []);
 
     // Timer Logic
@@ -535,6 +559,76 @@ export const useChessGame = () => {
         return game.moves({ square, verbose: true }).map((move) => move.to);
     }, [game]);
 
+    const saveGame = useCallback(() => {
+        const gameState: SavedGame = {
+            fen: game.fen(),
+            pgn: game.pgn(),
+            turn: game.turn(),
+            isGameOver,
+            winner,
+            difficulty,
+            history,
+            undoneMoves,
+            evaluation,
+            whiteTime,
+            blackTime,
+            playerColor,
+            volume,
+            isMuted
+        };
+        localStorage.setItem('chess_saved_game', JSON.stringify(gameState));
+        setHasSavedGame(true);
+        // Optional: Add toast notification logic here or return success
+        return true;
+    }, [game, isGameOver, winner, difficulty, history, undoneMoves, evaluation, whiteTime, blackTime, playerColor, volume, isMuted]);
+
+    const loadGame = useCallback(() => {
+        const savedData = localStorage.getItem('chess_saved_game');
+        if (!savedData) return false;
+
+        try {
+            const state: SavedGame = JSON.parse(savedData);
+
+            // Restore Game Logic
+            const loadedGame = new Chess();
+            loadedGame.loadPgn(state.pgn); // PGN restores FEN and history internally usually, but let's be safe
+            // If PGN fails or is empty but FEN exists (rare), load FEN
+            if (state.pgn === '') loadedGame.load(state.fen);
+
+            setGame(loadedGame);
+            setFen(loadedGame.fen());
+            setTurn(loadedGame.turn());
+            setIsGameOver(state.isGameOver);
+            setWinner(state.winner);
+            setDifficulty(state.difficulty);
+            setHistory(state.history);
+            setUndoneMoves(state.undoneMoves);
+            setEvaluation(state.evaluation);
+            setWhiteTime(state.whiteTime);
+            setBlackTime(state.blackTime);
+            setPlayerColor(state.playerColor);
+            setVolume(state.volume);
+            setIsMuted(state.isMuted);
+
+            // Restore Pieces Visuals
+            syncPiecesWithBoard(loadedGame.board());
+
+            // Restore Timer State
+            setTimerActive(!state.isGameOver);
+
+            // Clear any pending states
+            setLastMove(null);
+            setCheckSquare(null);
+            setHintMove(null);
+            setPromotionPending(null);
+
+            return true;
+        } catch (e) {
+            console.error("Failed to load game", e);
+            return false;
+        }
+    }, []);
+
     return {
         game,
         fen,
@@ -569,5 +663,8 @@ export const useChessGame = () => {
         setVolume,
         isMuted,
         toggleMute,
+        saveGame,
+        loadGame,
+        hasSavedGame
     };
 };

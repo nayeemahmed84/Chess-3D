@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { Scene } from './Scene';
 import { useChessGame } from '../hooks/useChessGame';
-import { RotateCcw, RotateCw, Trophy, ChevronLeft, ChevronRight, Volume2, VolumeX, Maximize, Minimize } from 'lucide-react';
+import { RotateCcw, RotateCw, Trophy, ChevronLeft, ChevronRight, Volume2, VolumeX, Maximize, Minimize, Save, Upload, Check, AlertTriangle, X } from 'lucide-react';
 
 import { open } from '@tauri-apps/plugin-shell';
 
@@ -38,11 +38,13 @@ const Game = () => {
         difficulty, setDifficulty, history, evaluation, whiteTime, blackTime, undoMove, redoMove,
         promotionPending, onPromotionSelect, lastMove, checkSquare, playerColor, setPlayerColor,
         hintMove, showHint, showThreats, setShowThreats, attackedSquares, requestHint,
-        volume, setVolume, isMuted, toggleMute
+        volume, setVolume, isMuted, toggleMute,
+        saveGame, loadGame, hasSavedGame
     } = useChessGame();
 
     const [isPanelVisible, setIsPanelVisible] = useState(true);
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [notification, setNotification] = useState<{ type: 'success' | 'confirm' | 'error', message: string, onConfirm?: () => void } | null>(null);
 
     const toggleFullscreen = () => {
         if (!document.fullscreenElement) {
@@ -427,6 +429,67 @@ const Game = () => {
                     </button>
                 </div>
 
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                    <button
+                        onClick={() => {
+                            if (saveGame()) {
+                                setNotification({
+                                    type: 'success',
+                                    message: 'Game Saved Successfully!'
+                                });
+                                setTimeout(() => setNotification(null), 2000);
+                            }
+                        }}
+                        title="Save Game"
+                        style={{
+                            flex: 1, padding: '8px', cursor: 'pointer',
+                            background: 'rgba(255, 255, 255, 0.1)', color: 'white',
+                            border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: '8px',
+                            display: 'flex', justifyContent: 'center', alignItems: 'center',
+                            fontSize: '14px', fontWeight: 500
+                        }}
+                    >
+                        <Save size={16} style={{ marginRight: '6px' }} />
+                        Save
+                    </button>
+                    {hasSavedGame && (
+                        <button
+                            onClick={() => {
+                                setNotification({
+                                    type: 'confirm',
+                                    message: 'Load saved game? Current progress will be lost.',
+                                    onConfirm: () => {
+                                        if (loadGame()) {
+                                            setNotification({
+                                                type: 'success',
+                                                message: 'Game Loaded Successfully!'
+                                            });
+                                            setTimeout(() => setNotification(null), 2000);
+                                        } else {
+                                            setNotification({
+                                                type: 'error',
+                                                message: 'Failed to load game.'
+                                            });
+                                            setTimeout(() => setNotification(null), 2000);
+                                        }
+                                    }
+                                });
+                            }}
+                            title="Load Game"
+                            style={{
+                                flex: 1, padding: '8px', cursor: 'pointer',
+                                background: 'rgba(76, 175, 80, 0.2)', color: '#81c784',
+                                border: '1px solid rgba(76, 175, 80, 0.4)', borderRadius: '8px',
+                                display: 'flex', justifyContent: 'center', alignItems: 'center',
+                                fontSize: '14px', fontWeight: 500
+                            }}
+                        >
+                            <Upload size={16} style={{ marginRight: '6px' }} />
+                            Load
+                        </button>
+                    )}
+                </div>
+
                 <button
                     onClick={resetGame}
                     style={{
@@ -451,8 +514,6 @@ const Game = () => {
                     <RotateCcw size={14} style={{ marginRight: '8px' }} />
                     Reset Game
                 </button>
-
-
             </div>
 
             {/* Right Panel - Move History */}
@@ -555,98 +616,204 @@ const Game = () => {
                 )
             }
 
-            {/* Game Over Modal */}
-            {
-                isGameOver && (
+            {/* Notification Modal */}
+            {notification && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    background: 'rgba(0, 0, 0, 0.6)',
+                    backdropFilter: 'blur(5px)',
+                    zIndex: 3000,
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    animation: 'modalScale 0.3s ease-out'
+                }}>
                     <div style={{
-                        position: 'fixed',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        height: '100%',
-                        background: 'rgba(0, 0, 0, 0.7)',
-                        backdropFilter: 'blur(8px)',
-                        zIndex: 2000,
-                        display: 'flex',
-                        justifyContent: 'center',
-                        alignItems: 'center'
+                        background: 'rgba(30, 30, 30, 0.9)',
+                        backdropFilter: 'blur(20px)',
+                        padding: '30px',
+                        borderRadius: '20px',
+                        border: `2px solid ${notification.type === 'success' ? '#4CAF50' : notification.type === 'error' ? '#f44336' : '#FFD700'}`,
+                        boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
+                        textAlign: 'center',
+                        minWidth: '300px',
+                        maxWidth: '400px'
                     }}>
                         <div style={{
-                            background: 'rgba(20, 20, 20, 0.9)',
-                            backdropFilter: 'blur(20px)',
-                            padding: '50px 70px',
-                            borderRadius: '24px',
-                            border: '2px solid rgba(255, 255, 255, 0.15)',
-                            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.8)',
-                            textAlign: 'center'
+                            width: '60px',
+                            height: '60px',
+                            borderRadius: '50%',
+                            background: notification.type === 'success' ? 'rgba(76, 175, 80, 0.2)' : notification.type === 'error' ? 'rgba(244, 67, 54, 0.2)' : 'rgba(255, 215, 0, 0.2)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            margin: '0 auto 20px auto',
+                            color: notification.type === 'success' ? '#4CAF50' : notification.type === 'error' ? '#f44336' : '#FFD700'
                         }}>
-                            {/* Inject CSS animations */}
-                            <style>{animationStyles}</style>
+                            {notification.type === 'success' ? <Check size={32} /> : notification.type === 'error' ? <X size={32} /> : <AlertTriangle size={32} />}
+                        </div>
 
-                            <Trophy size={80} style={{
-                                marginBottom: '20px',
-                                color: winner === 'Draw' ? '#AAA' : '#FFD700',
-                                animation: winner === 'Draw'
-                                    ? 'drawFloat 3s ease-in-out infinite'
-                                    : winner === 'White' || winner === 'Black' // Assuming winner is 'White' or 'Black' for victory
-                                        ? 'victoryBounce 2s ease-in-out infinite, victoryPulse 2s ease-in-out infinite'
-                                        : 'lossShake 0.5s ease-in-out infinite' // Fallback or specific loss condition if needed
-                            }} />
+                        <h3 style={{ margin: '0 0 10px 0', fontSize: '20px', color: 'white' }}>
+                            {notification.type === 'success' ? 'Success' : notification.type === 'error' ? 'Error' : 'Confirm Action'}
+                        </h3>
 
-                            <h2 style={{
-                                fontSize: '48px',
-                                fontWeight: '800',
-                                margin: '0 0 10px 0',
-                                background: 'linear-gradient(135deg, #FFF 0%, #CCC 100%)',
-                                WebkitBackgroundClip: 'text',
-                                WebkitTextFillColor: 'transparent',
-                                letterSpacing: '-1px'
-                            }}>
-                                {winner === 'Draw' ? 'Draw!' : 'Victory!'}
-                            </h2>
+                        <p style={{ margin: '0 0 24px 0', color: 'rgba(255, 255, 255, 0.8)', fontSize: '16px' }}>
+                            {notification.message}
+                        </p>
 
-                            <p style={{
-                                fontSize: '24px',
-                                color: 'rgba(255, 255, 255, 0.8)',
-                                margin: '0 0 40px 0',
-                                fontWeight: '500'
-                            }}>
-                                {winner === 'Draw' ? 'Game ended in a draw' : `${winner} wins the game!`}
-                            </p>
-
-                            <button
-                                onClick={resetGame}
-                                onMouseOver={(e) => {
-                                    e.currentTarget.style.transform = 'translateY(-2px)';
-                                    e.currentTarget.style.boxShadow = '0 12px 24px rgba(76, 175, 80, 0.4)';
-                                }}
-                                onMouseOut={(e) => {
-                                    e.currentTarget.style.transform = 'translateY(0)';
-                                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
-                                }}
-                                style={{
-                                    background: 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)',
-                                    color: 'white',
-                                    border: 'none',
-                                    padding: '18px 40px',
-                                    fontSize: '18px',
-                                    fontWeight: '600',
-                                    borderRadius: '12px',
-                                    cursor: 'pointer',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '12px',
-                                    transition: 'all 0.2s ease',
-                                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
-                                }}
-                            >
-                                <RotateCcw size={20} />
-                                Play Again
-                            </button>
+                        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                            {notification.type === 'confirm' ? (
+                                <>
+                                    <button
+                                        onClick={() => setNotification(null)}
+                                        style={{
+                                            padding: '10px 20px',
+                                            borderRadius: '8px',
+                                            border: '1px solid rgba(255, 255, 255, 0.2)',
+                                            background: 'transparent',
+                                            color: 'white',
+                                            cursor: 'pointer',
+                                            fontSize: '14px',
+                                            fontWeight: 500
+                                        }}
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            notification.onConfirm?.();
+                                            // Don't close immediately if we want to show success message
+                                        }}
+                                        style={{
+                                            padding: '10px 20px',
+                                            borderRadius: '8px',
+                                            border: 'none',
+                                            background: '#FFD700',
+                                            color: 'black',
+                                            cursor: 'pointer',
+                                            fontSize: '14px',
+                                            fontWeight: 600
+                                        }}
+                                    >
+                                        Confirm
+                                    </button>
+                                </>
+                            ) : (
+                                <button
+                                    onClick={() => setNotification(null)}
+                                    style={{
+                                        padding: '10px 30px',
+                                        borderRadius: '8px',
+                                        border: 'none',
+                                        background: notification.type === 'success' ? '#4CAF50' : '#f44336',
+                                        color: 'white',
+                                        cursor: 'pointer',
+                                        fontSize: '14px',
+                                        fontWeight: 600
+                                    }}
+                                >
+                                    Close
+                                </button>
+                            )}
                         </div>
                     </div>
-                )
-            }
+                </div>
+            )}
+
+            {/* Game Over Modal */}
+            {isGameOver && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    background: 'rgba(0, 0, 0, 0.7)',
+                    backdropFilter: 'blur(8px)',
+                    zIndex: 2000,
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center'
+                }}>
+                    <div style={{
+                        background: 'rgba(20, 20, 20, 0.9)',
+                        backdropFilter: 'blur(20px)',
+                        padding: '50px 70px',
+                        borderRadius: '24px',
+                        border: '2px solid rgba(255, 255, 255, 0.15)',
+                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.8)',
+                        textAlign: 'center'
+                    }}>
+                        {/* Inject CSS animations */}
+                        <style>{animationStyles}</style>
+
+                        <Trophy size={80} style={{
+                            marginBottom: '20px',
+                            color: winner === 'Draw' ? '#AAA' : '#FFD700',
+                            animation: winner === 'Draw'
+                                ? 'drawFloat 3s ease-in-out infinite'
+                                : winner === 'White' || winner === 'Black'
+                                    ? 'victoryBounce 2s ease-in-out infinite, victoryPulse 2s ease-in-out infinite'
+                                    : 'lossShake 0.5s ease-in-out infinite'
+                        }} />
+
+                        <h2 style={{
+                            fontSize: '48px',
+                            fontWeight: '800',
+                            margin: '0 0 10px 0',
+                            background: 'linear-gradient(135deg, #FFF 0%, #CCC 100%)',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                            letterSpacing: '-1px'
+                        }}>
+                            {winner === 'Draw' ? 'Draw!' : 'Victory!'}
+                        </h2>
+
+                        <p style={{
+                            fontSize: '24px',
+                            color: 'rgba(255, 255, 255, 0.8)',
+                            margin: '0 0 40px 0',
+                            fontWeight: '500'
+                        }}>
+                            {winner === 'Draw' ? 'Game ended in a draw' : `${winner} wins the game!`}
+                        </p>
+
+                        <button
+                            onClick={resetGame}
+                            onMouseOver={(e) => {
+                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                e.currentTarget.style.boxShadow = '0 12px 24px rgba(76, 175, 80, 0.4)';
+                            }}
+                            onMouseOut={(e) => {
+                                e.currentTarget.style.transform = 'translateY(0)';
+                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
+                            }}
+                            style={{
+                                background: 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)',
+                                color: 'white',
+                                border: 'none',
+                                padding: '18px 40px',
+                                fontSize: '18px',
+                                fontWeight: '600',
+                                borderRadius: '12px',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '12px',
+                                transition: 'all 0.2s ease',
+                                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
+                            }}
+                        >
+                            <RotateCcw size={20} />
+                            Play Again
+                        </button>
+                    </div>
+                </div>
+            )}
 
             <div style={{
                 position: 'absolute',
@@ -679,7 +846,7 @@ const Game = () => {
                     Nayeem
                 </span>
             </div>
-        </div >
+        </div>
     );
 };
 
