@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { Scene } from './Scene';
 import { useChessGame } from '../hooks/useChessGame';
-import { RotateCcw, RotateCw, Trophy, ChevronLeft, ChevronRight, Volume2, VolumeX } from 'lucide-react';
+import { RotateCcw, RotateCw, Trophy, ChevronLeft, ChevronRight, Volume2, VolumeX, Maximize, Minimize } from 'lucide-react';
 
 import { open } from '@tauri-apps/plugin-shell';
 
@@ -16,6 +16,19 @@ const Game = () => {
     } = useChessGame();
 
     const [isPanelVisible, setIsPanelVisible] = useState(true);
+    const [isFullscreen, setIsFullscreen] = useState(false);
+
+    const toggleFullscreen = () => {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().then(() => {
+                setIsFullscreen(true);
+            }).catch(() => { });
+        } else {
+            document.exitFullscreen().then(() => {
+                setIsFullscreen(false);
+            }).catch(() => { });
+        }
+    };
 
     const formatTime = (seconds: number) => {
         const mins = Math.floor(seconds / 60);
@@ -163,6 +176,34 @@ const Game = () => {
                     title="Hide Panel"
                 >
                     <ChevronLeft size={16} />
+                </button>
+
+                {/* Fullscreen Button */}
+                <button
+                    onClick={toggleFullscreen}
+                    style={{
+                        position: 'absolute',
+                        top: '12px',
+                        right: '44px',
+                        background: 'rgba(255, 255, 255, 0.1)',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        borderRadius: '6px',
+                        padding: '4px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.2s',
+                    }}
+                    onMouseOver={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                    }}
+                    onMouseOut={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                    }}
+                    title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+                >
+                    {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
                 </button>
                 <h2 style={{ margin: '0 0 16px 0', fontSize: '24px', fontWeight: 600, letterSpacing: '-0.5px' }}>Chess 3D</h2>
 
