@@ -1,7 +1,9 @@
 import { useMemo, useRef, useEffect, useState } from 'react';
-import { Vector2, Vector3, Color, Mesh, Plane } from 'three';
+import { Vector2, Vector3, Color, Mesh, Plane, BufferGeometry, Material } from 'three';
 import { useFrame, useThree, ThreeEvent } from '@react-three/fiber';
+import { useGLTF } from '@react-three/drei';
 import { Square } from 'chess.js';
+import { GLTF } from 'three-stdlib';
 
 interface PieceProps {
     id: string;
@@ -17,6 +19,15 @@ interface PieceProps {
     onInteractionEnd: () => void;
 }
 
+type GLTFResult = GLTF & {
+    nodes: {
+        [key: string]: Mesh;
+    };
+    materials: {
+        [key: string]: Material;
+    };
+};
+
 export const Piece = ({ type, color, position, isCaptured, onDragStart, onDragEnd, onSelect, onInteractionStart, onInteractionEnd }: PieceProps) => {
     const isWhite = color === 'w';
     const materialColor = isWhite ? '#ffffff' : '#555555';
@@ -24,56 +35,36 @@ export const Piece = ({ type, color, position, isCaptured, onDragStart, onDragEn
     const [isDragging, setIsDragging] = useState(false);
     const groundPlane = useRef(new Plane(new Vector3(0, 1, 0), 0));
 
-    const points = useMemo(() => {
-        const pts: Vector2[] = [];
-        const add = (x: number, y: number) => pts.push(new Vector2(x, y));
+    // Load the chess model
+    const { nodes } = useGLTF('https://raw.githubusercontent.com/jpbruyere/VkChess.net/master/data/models/chess.gltf') as GLTFResult;
+
+    // Debug: Log available nodes to find correct names
+    useEffect(() => {
+        console.log('Available GLTF Nodes:', Object.keys(nodes));
+    }, [nodes]);
+
+    const geometry = useMemo(() => {
+        let geo: BufferGeometry | undefined;
+
+        // Helper to safely get geometry
+        const getGeo = (name: string) => nodes[name]?.geometry;
+
         switch (type) {
-            case 'p':
-                add(0, 0); add(0.3, 0); add(0.32, 0.05); add(0.3, 0.1);
-                add(0.15, 0.15); add(0.12, 0.5); add(0.09, 0.65);
-                add(0.11, 0.7); add(0.16, 0.75); add(0.2, 0.82);
-                add(0.2, 0.92); add(0.16, 0.99); add(0.1, 1.02); add(0, 1.02);
-                break;
-            case 'r':
-                add(0, 0); add(0.3, 0); add(0.32, 0.05); add(0.3, 0.1);
-                add(0.15, 0.15); add(0.13, 0.6); add(0.18, 0.65);
-                add(0.2, 0.9); add(0.25, 0.95); add(0.25, 1.15);
-                add(0.15, 1.15); add(0.15, 1.05); add(0, 1.05);
-                break;
-            case 'n':
-                add(0, 0); add(0.3, 0); add(0.32, 0.05); add(0.3, 0.1);
-                add(0.15, 0.15); add(0.13, 0.55); add(0.17, 0.65);
-                add(0.25, 0.75); add(0.28, 0.85); add(0.25, 0.95);
-                add(0.2, 1.05); add(0.15, 1.15); add(0.08, 1.2); add(0, 1.2);
-                break;
-            case 'b':
-                add(0, 0); add(0.3, 0); add(0.32, 0.05); add(0.3, 0.1);
-                add(0.15, 0.15); add(0.13, 0.6); add(0.11, 0.7);
-                add(0.13, 0.75); add(0.18, 0.8); add(0.2, 0.95);
-                add(0.18, 1.08); add(0.12, 1.18); add(0.08, 1.28);
-                add(0.04, 1.35); add(0, 1.38);
-                break;
-            case 'q':
-                add(0, 0); add(0.3, 0); add(0.32, 0.05); add(0.3, 0.1);
-                add(0.16, 0.15); add(0.14, 0.65); add(0.12, 0.8);
-                add(0.14, 0.85); add(0.18, 0.9); add(0.2, 1.05);
-                add(0.22, 1.15); add(0.25, 1.25); add(0.23, 1.35);
-                add(0.18, 1.42); add(0.12, 1.48); add(0.06, 1.52);
-                add(0, 1.54);
-                break;
-            case 'k':
-                add(0, 0); add(0.3, 0); add(0.32, 0.05); add(0.3, 0.1);
-                add(0.16, 0.15); add(0.14, 0.65); add(0.12, 0.85);
-                add(0.14, 0.9); add(0.18, 0.95); add(0.2, 1.1);
-                add(0.22, 1.2); add(0.24, 1.3); add(0.22, 1.4);
-                add(0.15, 1.5); add(0.12, 1.58); add(0.12, 1.68);
-                add(0.08, 1.72); add(0, 1.72);
-                break;
-            default:
-                add(0, 0); add(0.2, 0); add(0.15, 0.5); add(0, 0.5);
+            case 'p': geo = getGeo('Pawn') || getGeo('pawn'); break;
+            case 'r': geo = getGeo('Rook') || getGeo('rook'); break;
+            case 'n': geo = getGeo('Knight') || getGeo('knight') || getGeo('Horse') || getGeo('horse'); break;
+            case 'b': geo = getGeo('Bishop') || getGeo('bishop'); break;
+            case 'q': geo = getGeo('Queen') || getGeo('queen'); break;
+            case 'k': geo = getGeo('King') || getGeo('king'); break;
+            default: geo = getGeo('Pawn');
         }
-        return pts;
-    }, [type]);
+
+        return geo;
+    }, [type, nodes]);
+
+    // Scale correction for this specific model if needed
+    const scale = 0.4;
+    const rotationY = isWhite ? -Math.PI / 2 : Math.PI / 2; // Adjust based on model orientation
 
     const meshRef = useRef<Mesh>(null);
     const trailRef = useRef<Mesh>(null);
@@ -268,8 +259,11 @@ export const Piece = ({ type, color, position, isCaptured, onDragStart, onDragEn
                 castShadow
                 receiveShadow
                 onPointerDown={handlePointerDown}
+                geometry={geometry}
+                scale={[scale, scale, scale]}
+                rotation={[0, rotationY, 0]}
             >
-                <latheGeometry args={[points, 32]} />
+                {!geometry && <cylinderGeometry args={[0.5, 0.5, 1, 32]} />}
                 <meshPhysicalMaterial
                     color={materialColor}
                     roughness={0.02}
@@ -285,3 +279,6 @@ export const Piece = ({ type, color, position, isCaptured, onDragStart, onDragEn
         </group>
     );
 };
+
+// Preload the model
+useGLTF.preload('https://raw.githubusercontent.com/jpbruyere/VkChess.net/master/data/models/chess.gltf');
