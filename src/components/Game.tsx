@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { Scene } from './Scene';
 import { useChessGame } from '../hooks/useChessGame';
+import { GameAnalysis } from './GameAnalysis';
 import { RotateCcw, RotateCw, Trophy, ChevronLeft, ChevronRight, Volume2, VolumeX, Maximize, Minimize, Save, Upload, Check, AlertTriangle, X } from 'lucide-react';
 
 import { open } from '@tauri-apps/plugin-shell';
@@ -39,11 +40,12 @@ const Game = () => {
         promotionPending, onPromotionSelect, lastMove, checkSquare, playerColor, setPlayerColor,
         hintMove, showHint, showThreats, setShowThreats, attackedSquares, requestHint,
         volume, setVolume, isMuted, toggleMute,
-        saveGame, loadGame, hasSavedGame
+        saveGame, loadGame, hasSavedGame, game, navigateToMove
     } = useChessGame();
 
     const [isPanelVisible, setIsPanelVisible] = useState(true);
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [showAnalysis, setShowAnalysis] = useState(false);
     const [notification, setNotification] = useState<{ type: 'success' | 'confirm' | 'error', message: string, onConfirm?: () => void } | null>(null);
 
     const toggleFullscreen = () => {
@@ -811,7 +813,7 @@ const Game = () => {
             )}
 
             {/* Game Over Modal */}
-            {isGameOver && (
+            {isGameOver && !showAnalysis && (
                 <div style={{
                     position: 'fixed',
                     top: 0,
@@ -891,14 +893,54 @@ const Game = () => {
                                 alignItems: 'center',
                                 gap: '12px',
                                 transition: 'all 0.2s ease',
-                                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
+                                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+                                marginRight: '15px'
                             }}
                         >
                             <RotateCcw size={20} />
                             Play Again
                         </button>
+
+                        <button
+                            onClick={() => setShowAnalysis(true)}
+                            onMouseOver={(e) => {
+                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                e.currentTarget.style.boxShadow = '0 12px 24px rgba(33, 150, 243, 0.4)';
+                            }}
+                            onMouseOut={(e) => {
+                                e.currentTarget.style.transform = 'translateY(0)';
+                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
+                            }}
+                            style={{
+                                background: 'linear-gradient(135deg, #2196F3 0%, #1976D2 100%)',
+                                color: 'white',
+                                border: 'none',
+                                padding: '18px 40px',
+                                fontSize: '18px',
+                                fontWeight: '600',
+                                borderRadius: '12px',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '12px',
+                                transition: 'all 0.2s ease',
+                                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
+                            }}
+                        >
+                            📊 Analyze Game
+                        </button>
                     </div>
                 </div>
+            )}
+
+            {/* Game Analysis Modal */}
+            {showAnalysis && (
+                <GameAnalysis
+                    pgn={game.pgn()}
+                    winner={winner}
+                    onClose={() => setShowAnalysis(false)}
+                    onNavigateToMove={navigateToMove}
+                />
             )}
 
             <div style={{

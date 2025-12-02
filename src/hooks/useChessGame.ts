@@ -687,6 +687,29 @@ export const useChessGame = () => {
         }
     }, []);
 
+    const navigateToMove = useCallback((moveIndex: number) => {
+        const gameCopy = new Chess();
+        const moves = game.history({ verbose: true });
+
+        // Replay moves up to the specified index
+        for (let i = 0; i <= moveIndex && i < moves.length; i++) {
+            gameCopy.move(moves[i].san);
+        }
+
+        setFen(gameCopy.fen());
+        syncPiecesWithBoard(gameCopy.board());
+
+        // Update visual hints
+        if (moveIndex >= 0 && moveIndex < moves.length) {
+            const move = moves[moveIndex];
+            setLastMove({ from: move.from, to: move.to });
+        } else {
+            setLastMove(null);
+        }
+
+        setCheckSquare(gameCopy.inCheck() ? gameCopy.board().flat().find(p => p?.type === 'k' && p.color === gameCopy.turn())?.square as Square : null);
+    }, [game]);
+
     return {
         game,
         fen,
@@ -724,6 +747,7 @@ export const useChessGame = () => {
         saveGame,
         loadGame,
         hasSavedGame,
-        annotations
+        annotations,
+        navigateToMove
     };
 };
