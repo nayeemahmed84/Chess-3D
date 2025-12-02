@@ -1,17 +1,15 @@
 import { Chess } from 'chess.js';
 
 // Stockfish.js exports a Worker, not a function
-// We need to instantiate it as a Web Worker
+// Use public directory path for both dev and production (Tauri) builds
 const wasmSupported = typeof WebAssembly === 'object' && WebAssembly.validate(Uint8Array.of(0x0, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00));
 
 // @ts-ignore
+// Use public directory path - works in both Vite dev server and Tauri builds
 const stockfish = new Worker(
-    new URL(
-        wasmSupported
-            ? '../../../node_modules/stockfish.js/stockfish.wasm.js'
-            : '../../../node_modules/stockfish.js/stockfish.js',
-        import.meta.url
-    )
+    wasmSupported
+        ? '/stockfish.wasm.js'
+        : '/stockfish.js'
 );
 
 console.log('[Worker] Stockfish instance created');
@@ -149,7 +147,7 @@ self.onmessage = (e: MessageEvent) => {
         if (difficulty === 'Medium') depth = 5;
         if (difficulty === 'Hard') depth = 15;
 
-        console.log('[Worker] Requesting move/hint at depth', depth);
+        console.log('[Worker] Requesting', type, 'at depth', depth);
         stockfish.postMessage(`go depth ${depth}`);
     }
 
