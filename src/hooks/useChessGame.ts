@@ -134,11 +134,11 @@ export const useChessGame = () => {
         setPieces(initialPieces);
         setEvaluation(evaluateBoard(game));
 
-        // Check for saved game on mount
-        const savedData = localStorage.getItem('chess_saved_game');
-        if (savedData) {
-            setHasSavedGame(true);
-        }
+        // Check for saved games in any slot on mount
+        const hasAnySave = Array.from({ length: 5 }, (_, i) =>
+            localStorage.getItem(`chess_save_slot_${i}`)
+        ).some(save => save !== null);
+        setHasSavedGame(hasAnySave);
     }, []);
 
     // Timer Logic
@@ -617,7 +617,7 @@ export const useChessGame = () => {
         return game.moves({ square, verbose: true }).map((move) => move.to);
     }, [game]);
 
-    const saveGame = useCallback(() => {
+    const saveGame = useCallback((slotIndex: number = 0) => {
         const gameState: SavedGame = {
             fen: game.fen(),
             pgn: game.pgn(),
@@ -634,14 +634,27 @@ export const useChessGame = () => {
             volume,
             isMuted
         };
-        localStorage.setItem('chess_saved_game', JSON.stringify(gameState));
-        setHasSavedGame(true);
-        // Optional: Add toast notification logic here or return success
+
+        // Add metadata
+        const savedGame = {
+            ...gameState,
+            savedAt: Date.now(),
+            moveCount: history.length
+        };
+
+        localStorage.setItem(`chess_save_slot_${slotIndex}`, JSON.stringify(savedGame));
+
+        // Update hasSavedGame flag
+        const hasAnySave = Array.from({ length: 5 }, (_, i) =>
+            localStorage.getItem(`chess_save_slot_${i}`)
+        ).some(save => save !== null);
+        setHasSavedGame(hasAnySave);
+
         return true;
     }, [game, isGameOver, winner, difficulty, history, undoneMoves, evaluation, whiteTime, blackTime, playerColor, volume, isMuted]);
 
-    const loadGame = useCallback(() => {
-        const savedData = localStorage.getItem('chess_saved_game');
+    const loadGame = useCallback((slotIndex: number = 0) => {
+        const savedData = localStorage.getItem(`chess_save_slot_${slotIndex}`);
         if (!savedData) return false;
 
         try {
@@ -649,8 +662,7 @@ export const useChessGame = () => {
 
             // Restore Game Logic
             const loadedGame = new Chess();
-            loadedGame.loadPgn(state.pgn); // PGN restores FEN and history internally usually, but let's be safe
-            // If PGN fails or is empty but FEN exists (rare), load FEN
+            loadedGame.loadPgn(state.pgn);
             if (state.pgn === '') loadedGame.load(state.fen);
 
             setGame(loadedGame);
@@ -685,6 +697,16 @@ export const useChessGame = () => {
             console.error("Failed to load game", e);
             return false;
         }
+    }, []);
+
+    const deleteSave = useCallback((slotIndex: number) => {
+        localStorage.removeItem(`chess_save_slot_${slotIndex}`);
+
+        // Update hasSavedGame flag
+        const hasAnySave = Array.from({ length: 5 }, (_, i) =>
+            localStorage.getItem(`chess_save_slot_${i}`)
+        ).some(save => save !== null);
+        setHasSavedGame(hasAnySave);
     }, []);
 
     const navigateToMove = useCallback((moveIndex: number) => {
@@ -746,6 +768,7 @@ export const useChessGame = () => {
         toggleMute,
         saveGame,
         loadGame,
+        deleteSave,
         hasSavedGame,
         annotations,
         navigateToMove

@@ -3,6 +3,7 @@ import { Canvas } from '@react-three/fiber';
 import { Scene } from './Scene';
 import { useChessGame } from '../hooks/useChessGame';
 import { GameAnalysis } from './GameAnalysis';
+import { SaveLoadModal } from './SaveLoadModal';
 import { RotateCcw, RotateCw, Trophy, ChevronLeft, ChevronRight, Volume2, VolumeX, Maximize, Minimize, Save, Upload, Check, AlertTriangle, X } from 'lucide-react';
 
 import { open } from '@tauri-apps/plugin-shell';
@@ -40,12 +41,13 @@ const Game = () => {
         promotionPending, onPromotionSelect, lastMove, checkSquare, playerColor, setPlayerColor,
         hintMove, showHint, showThreats, setShowThreats, attackedSquares, requestHint,
         volume, setVolume, isMuted, toggleMute,
-        saveGame, loadGame, hasSavedGame, game, navigateToMove
+        saveGame, loadGame, deleteSave, hasSavedGame, game, navigateToMove
     } = useChessGame();
 
     const [isPanelVisible, setIsPanelVisible] = useState(true);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [showAnalysis, setShowAnalysis] = useState(false);
+    const [saveLoadMode, setSaveLoadMode] = useState<'save' | 'load' | null>(null);
     const [notification, setNotification] = useState<{ type: 'success' | 'confirm' | 'error', message: string, onConfirm?: () => void } | null>(null);
 
     const toggleFullscreen = () => {
@@ -519,15 +521,7 @@ const Game = () => {
 
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
                     <button
-                        onClick={() => {
-                            if (saveGame()) {
-                                setNotification({
-                                    type: 'success',
-                                    message: 'Game Saved Successfully!'
-                                });
-                                setTimeout(() => setNotification(null), 2000);
-                            }
-                        }}
+                        onClick={() => setSaveLoadMode('save')}
                         title="Save Game"
                         style={{
                             flex: 1, padding: '8px', cursor: 'pointer',
@@ -540,42 +534,23 @@ const Game = () => {
                         <Save size={16} style={{ marginRight: '6px' }} />
                         Save
                     </button>
-                    {hasSavedGame && (
-                        <button
-                            onClick={() => {
-                                setNotification({
-                                    type: 'confirm',
-                                    message: 'Load saved game? Current progress will be lost.',
-                                    onConfirm: () => {
-                                        if (loadGame()) {
-                                            setNotification({
-                                                type: 'success',
-                                                message: 'Game Loaded Successfully!'
-                                            });
-                                            setTimeout(() => setNotification(null), 2000);
-                                        } else {
-                                            setNotification({
-                                                type: 'error',
-                                                message: 'Failed to load game.'
-                                            });
-                                            setTimeout(() => setNotification(null), 2000);
-                                        }
-                                    }
-                                });
-                            }}
-                            title="Load Game"
-                            style={{
-                                flex: 1, padding: '8px', cursor: 'pointer',
-                                background: 'rgba(76, 175, 80, 0.2)', color: '#81c784',
-                                border: '1px solid rgba(76, 175, 80, 0.4)', borderRadius: '8px',
-                                display: 'flex', justifyContent: 'center', alignItems: 'center',
-                                fontSize: '14px', fontWeight: 500
-                            }}
-                        >
-                            <Upload size={16} style={{ marginRight: '6px' }} />
-                            Load
-                        </button>
-                    )}
+                    <button
+                        onClick={() => setSaveLoadMode('load')}
+                        title="Load Game"
+                        style={{
+                            flex: 1, padding: '8px', cursor: hasSavedGame ? 'pointer' : 'not-allowed',
+                            background: hasSavedGame ? 'rgba(76, 175, 80, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+                            color: hasSavedGame ? '#81c784' : 'rgba(255, 255, 255, 0.5)',
+                            border: hasSavedGame ? '1px solid rgba(76, 175, 80, 0.4)' : '1px solid rgba(255, 255, 255, 0.2)',
+                            borderRadius: '8px',
+                            display: 'flex', justifyContent: 'center', alignItems: 'center',
+                            fontSize: '14px', fontWeight: 500
+                        }}
+                        disabled={!hasSavedGame}
+                    >
+                        <Upload size={16} style={{ marginRight: '6px' }} />
+                        Load
+                    </button>
                 </div>
 
                 <button
@@ -974,6 +949,48 @@ const Game = () => {
                     Nayeem
                 </span>
             </div>
+
+            {/* Save/Load Modal */}
+            {saveLoadMode && (
+                <SaveLoadModal
+                    mode={saveLoadMode}
+                    onClose={() => setSaveLoadMode(null)}
+                    onSave={(slotIndex) => {
+                        if (saveGame(slotIndex)) {
+                            setNotification({
+                                type: 'success',
+                                message: `Game saved to Slot ${slotIndex + 1}!`
+                            });
+                            setTimeout(() => setNotification(null), 2000);
+                        }
+                        setSaveLoadMode(null);
+                    }}
+                    onLoad={(slotIndex) => {
+                        if (loadGame(slotIndex)) {
+                            setNotification({
+                                type: 'success',
+                                message: `Game loaded from Slot ${slotIndex + 1}!`
+                            });
+                            setTimeout(() => setNotification(null), 2000);
+                        } else {
+                            setNotification({
+                                type: 'error',
+                                message: 'Failed to load game.'
+                            });
+                            setTimeout(() => setNotification(null), 2000);
+                        }
+                        setSaveLoadMode(null);
+                    }}
+                    onDelete={(slotIndex) => {
+                        deleteSave(slotIndex);
+                        setNotification({
+                            type: 'success',
+                            message: `Slot ${slotIndex + 1} deleted!`
+                        });
+                        setTimeout(() => setNotification(null), 2000);
+                    }}
+                />
+            )}
         </div>
     );
 };
