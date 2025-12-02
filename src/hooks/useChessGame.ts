@@ -732,6 +732,48 @@ export const useChessGame = () => {
         setCheckSquare(gameCopy.inCheck() ? gameCopy.board().flat().find(p => p?.type === 'k' && p.color === gameCopy.turn())?.square as Square : null);
     }, [game]);
 
+    const importPGN = useCallback((pgn: string) => {
+        try {
+            const newGame = new Chess();
+            newGame.loadPgn(pgn);
+
+            setGame(newGame);
+            setFen(newGame.fen());
+            setTurn(newGame.turn());
+            setHistory(newGame.history());
+            setUndoneMoves([]);
+            setEvaluation(evaluateBoard(newGame));
+
+            // Reset game state
+            setIsGameOver(newGame.isGameOver());
+            if (newGame.isGameOver()) {
+                setTimerActive(false);
+                if (newGame.isCheckmate()) {
+                    setWinner(newGame.turn() === 'w' ? 'Black' : 'White');
+                } else {
+                    setWinner('Draw');
+                }
+            } else {
+                setWinner(null);
+                setTimerActive(false); // Don't auto-start timer for imported games
+            }
+
+            // Update pieces
+            syncPiecesWithBoard(newGame.board());
+
+            // Clear visual hints
+            setLastMove(null);
+            setCheckSquare(newGame.inCheck() ? newGame.board().flat().find(p => p?.type === 'k' && p.color === newGame.turn())?.square as Square : null);
+            setHintMove(null);
+            setPromotionPending(null);
+
+            return true;
+        } catch (e) {
+            console.error("Failed to import PGN", e);
+            return false;
+        }
+    }, []);
+
     return {
         game,
         fen,
@@ -771,6 +813,7 @@ export const useChessGame = () => {
         deleteSave,
         hasSavedGame,
         annotations,
-        navigateToMove
+        navigateToMove,
+        importPGN
     };
 };

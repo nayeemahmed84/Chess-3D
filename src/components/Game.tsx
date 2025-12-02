@@ -4,7 +4,8 @@ import { Scene } from './Scene';
 import { useChessGame } from '../hooks/useChessGame';
 import { GameAnalysis } from './GameAnalysis';
 import { SaveLoadModal } from './SaveLoadModal';
-import { RotateCcw, RotateCw, Trophy, ChevronLeft, ChevronRight, Volume2, VolumeX, Maximize, Minimize, Save, Upload, Check, AlertTriangle, X } from 'lucide-react';
+import { PGNModal } from './PGNModal';
+import { RotateCcw, RotateCw, Trophy, ChevronLeft, ChevronRight, Volume2, VolumeX, Maximize, Minimize, Save, Upload, Check, AlertTriangle, X, Download } from 'lucide-react';
 
 import { open } from '@tauri-apps/plugin-shell';
 
@@ -41,13 +42,14 @@ const Game = () => {
         promotionPending, onPromotionSelect, lastMove, checkSquare, playerColor, setPlayerColor,
         hintMove, showHint, showThreats, setShowThreats, attackedSquares, requestHint,
         volume, setVolume, isMuted, toggleMute,
-        saveGame, loadGame, deleteSave, hasSavedGame, game, navigateToMove
+        saveGame, loadGame, deleteSave, hasSavedGame, game, navigateToMove, importPGN
     } = useChessGame();
 
     const [isPanelVisible, setIsPanelVisible] = useState(true);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [showAnalysis, setShowAnalysis] = useState(false);
     const [saveLoadMode, setSaveLoadMode] = useState<'save' | 'load' | null>(null);
+    const [pgnMode, setPGNMode] = useState<'export' | 'import' | null>(null);
     const [notification, setNotification] = useState<{ type: 'success' | 'confirm' | 'error', message: string, onConfirm?: () => void } | null>(null);
 
     const toggleFullscreen = () => {
@@ -577,6 +579,38 @@ const Game = () => {
                     <RotateCcw size={14} style={{ marginRight: '8px' }} />
                     Reset Game
                 </button>
+
+                {/* PGN Import/Export */}
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                    <button
+                        onClick={() => setPGNMode('export')}
+                        title="Export PGN"
+                        style={{
+                            flex: 1, padding: '8px', cursor: 'pointer',
+                            background: 'rgba(255, 255, 255, 0.1)', color: 'white',
+                            border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: '8px',
+                            display: 'flex', justifyContent: 'center', alignItems: 'center',
+                            fontSize: '14px', fontWeight: 500
+                        }}
+                    >
+                        <Download size={16} style={{ marginRight: '6px' }} />
+                        Export
+                    </button>
+                    <button
+                        onClick={() => setPGNMode('import')}
+                        title="Import PGN"
+                        style={{
+                            flex: 1, padding: '8px', cursor: 'pointer',
+                            background: 'rgba(255, 255, 255, 0.1)', color: 'white',
+                            border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: '8px',
+                            display: 'flex', justifyContent: 'center', alignItems: 'center',
+                            fontSize: '14px', fontWeight: 500
+                        }}
+                    >
+                        <Upload size={16} style={{ marginRight: '6px' }} />
+                        Import
+                    </button>
+                </div>
             </div>
 
             {/* Right Panel - Move History */}
@@ -988,6 +1022,26 @@ const Game = () => {
                             message: `Slot ${slotIndex + 1} deleted!`
                         });
                         setTimeout(() => setNotification(null), 2000);
+                    }}
+                />
+            )}
+
+            {/* PGN Modal */}
+            {pgnMode && (
+                <PGNModal
+                    mode={pgnMode}
+                    currentPGN={game.pgn()}
+                    onClose={() => setPGNMode(null)}
+                    onImport={(pgn) => {
+                        const success = importPGN(pgn);
+                        if (success) {
+                            setNotification({
+                                type: 'success',
+                                message: 'Game imported successfully!'
+                            });
+                            setTimeout(() => setNotification(null), 2000);
+                        }
+                        return success;
                     }}
                 />
             )}
