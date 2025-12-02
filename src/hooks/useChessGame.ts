@@ -364,7 +364,14 @@ export const useChessGame = () => {
                 }
 
                 if (from && to) {
-                    setHintMove({ from, to });
+                    // Validate that the hint is legal for the current board state
+                    // This prevents stale hints from showing up
+                    const piece = game.get(from);
+                    if (piece && piece.color === game.turn()) {
+                        setHintMove({ from, to });
+                    } else {
+                        console.warn('[Hook] Ignored invalid hint:', from, to, 'Piece:', piece);
+                    }
                 }
             }
             return;

@@ -28,6 +28,10 @@ interface AnalysisState {
 let pendingAnalysis: AnalysisState | null = null;
 let pendingRequestType: 'move' | 'hint' | null = null; // Track what kind of request we're handling
 
+// Synchronization state
+let isFlushing = false;
+let queuedCommand: (() => void) | null = null;
+
 const parseScore = (line: string): number | null => {
     const parts = line.split(' ');
     const scoreIndex = parts.indexOf('score');
@@ -113,7 +117,21 @@ const finishAnalysis = () => {
 // Listen to Stockfish output
 stockfish.addEventListener('message', (e) => {
     const line = e.data;
-    console.log('[Worker] Stockfish output:', line);
+
+    // Synchronization: Wait for readyok before processing new commands
+    if (line === 'readyok') {
+        isFlushing = false;
+        if (queuedCommand) {
+            queuedCommand();
+            queuedCommand = null;
+        }
+        return;
+    }
+
+    // Ignore any output (like bestmove from cancelled search) while flushing
+    if (isFlushing) return;
+
+    // console.log('[Worker] Stockfish output:', line);
 
     if (line.startsWith('info') && pendingAnalysis) {
         parseAnalysisInfo(line);
@@ -130,48 +148,60 @@ stockfish.postMessage('uci');
 
 // Listen to messages from main thread
 self.onmessage = (e: MessageEvent) => {
-    console.log('[Worker] Received message from main thread:', e.data);
+    console.log('[Worker] Received message from main thread:', e.data.type);
     const { type, fen, move, difficulty } = e.data;
 
     if (type === 'init') {
         return;
     }
 
-    if (type === 'move' || type === 'hint') {
-        pendingAnalysis = null;
-        pendingRequestType = type;
-        stockfish.postMessage(`position fen ${fen}`);
+    // Prepare the command to run after flushing
+    const command = () => {
+        if (type === 'move' || type === 'hint') {
+            pendingAnalysis = null; // Clear any stale analysis state
+            pendingRequestType = type;
 
-        let depth = 10;
-        if (difficulty === 'Easy') depth = 1;
-        if (difficulty === 'Medium') depth = 5;
-        if (difficulty === 'Hard') depth = 15;
+            stockfish.postMessage(`position fen ${fen}`);
 
-        console.log('[Worker] Requesting', type, 'at depth', depth);
-        stockfish.postMessage(`go depth ${depth}`);
-    }
+            let depth = 10;
+            if (difficulty === 'Easy') depth = 1;
+            if (difficulty === 'Medium') depth = 5;
+            if (difficulty === 'Hard') depth = 15;
 
-    if (type === 'analyze') {
-        const game = new Chess(fen);
-        let uciMove = move;
-        try {
-            const m = game.move(move);
-            if (m) {
-                uciMove = m.from + m.to + (m.promotion || '');
-            }
-        } catch (e) {
-            console.error('[Worker] Failed to convert move to UCI:', e);
+            console.log('[Worker] Requesting', type, 'at depth', depth);
+            stockfish.postMessage(`go depth ${depth}`);
         }
 
-        pendingAnalysis = {
-            fen,
-            playedMove: uciMove,
-            playedMoveSan: move,
-            step: 'find_best'
-        };
+        if (type === 'analyze') {
+            pendingRequestType = null; // Clear any stale request type
 
-        console.log('[Worker] Starting analysis for move:', move);
-        stockfish.postMessage(`position fen ${fen}`);
-        stockfish.postMessage(`go depth 10`);
-    }
+            const game = new Chess(fen);
+            let uciMove = move;
+            try {
+                const m = game.move(move);
+                if (m) {
+                    uciMove = m.from + m.to + (m.promotion || '');
+                }
+            } catch (e) {
+                console.error('[Worker] Failed to convert move to UCI:', e);
+            }
+
+            pendingAnalysis = {
+                fen,
+                playedMove: uciMove,
+                playedMoveSan: move,
+                step: 'find_best'
+            };
+
+            console.log('[Worker] Starting analysis for move:', move);
+            stockfish.postMessage(`position fen ${fen}`);
+            stockfish.postMessage(`go depth 10`);
+        }
+    };
+
+    // Trigger the flush sequence
+    queuedCommand = command;
+    isFlushing = true;
+    stockfish.postMessage('stop');
+    stockfish.postMessage('isready');
 };
