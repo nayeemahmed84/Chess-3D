@@ -1,19 +1,29 @@
-import { useMemo, useRef, useEffect } from 'react';
-import { Vector2, Vector3, Color, Mesh } from 'three';
-import { useFrame } from '@react-three/fiber';
+import { useMemo, useRef, useEffect, useState } from 'react';
+import { Vector2, Vector3, Color, Mesh, Plane } from 'three';
+import { useFrame, useThree, ThreeEvent } from '@react-three/fiber';
+import { Square } from 'chess.js';
 
 interface PieceProps {
+    id: string;
     type: string; // p, r, n, b, q, k
     color: 'w' | 'b';
     position: [number, number, number]; // target board position
+    square: Square;
     isCaptured?: boolean;
+    onDragStart: () => void;
+    onDragEnd: (endSquare: Square | null) => void;
+    onSelect: () => void;
+    onInteractionStart: () => void;
+    onInteractionEnd: () => void;
 }
 
-export const Piece = ({ type, color, position, isCaptured }: PieceProps) => {
+export const Piece = ({ type, color, position, isCaptured, onDragStart, onDragEnd, onSelect, onInteractionStart, onInteractionEnd }: PieceProps) => {
     const isWhite = color === 'w';
-    const materialColor = isWhite ? '#ffffff' : '#555555'; // Lighter grey for smoked glass effect
+    const materialColor = isWhite ? '#ffffff' : '#555555';
+    const { camera, raycaster, gl } = useThree();
+    const [isDragging, setIsDragging] = useState(false);
+    const groundPlane = useRef(new Plane(new Vector3(0, 1, 0), 0));
 
-    // ---- Geometry generation (unchanged) ----
     const points = useMemo(() => {
         const pts: Vector2[] = [];
         const add = (x: number, y: number) => pts.push(new Vector2(x, y));
@@ -65,28 +75,109 @@ export const Piece = ({ type, color, position, isCaptured }: PieceProps) => {
         return pts;
     }, [type]);
 
-    // ---- Animation refs ----
     const meshRef = useRef<Mesh>(null);
     const trailRef = useRef<Mesh>(null);
     const startPos = useRef<Vector3>(new Vector3(...position));
     const targetPos = useRef<Vector3>(new Vector3(...position));
+    const dragPos = useRef<Vector3>(new Vector3(...position));
     const progress = useRef(0);
     const animating = useRef(false);
-    const timeSinceCaptured = useRef(0); // Track capture animation time
-
-    // Capture animation state
+    const timeSinceCaptured = useRef(0);
     const velocity = useRef(new Vector3(0, 0, 0));
     const rotationAxis = useRef(new Vector3(Math.random(), Math.random(), Math.random()).normalize());
 
-    // When the board position changes, start animation and trail
+    const pointerDownPos = useRef({ x: 0, y: 0 });
+    const hasMoved = useRef(false);
+    const dragStarted = useRef(false);
+
+    const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
+        if (isCaptured) return;
+        e.stopPropagation(); // Stop propagation to prevent Board/Square click handlers
+        onInteractionStart(); // Disable OrbitControls
+        pointerDownPos.current = { x: e.clientX, y: e.clientY };
+        hasMoved.current = false;
+        dragStarted.current = false;
+        setIsDragging(true);
+    };
+
     useEffect(() => {
+        if (!isDragging) return;
+
+        const canvas = gl.domElement;
+
+        const handleGlobalPointerMove = (e: PointerEvent) => {
+            const dx = e.clientX - pointerDownPos.current.x;
+            const dy = e.clientY - pointerDownPos.current.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance > 5) {
+                hasMoved.current = true;
+                if (!dragStarted.current) {
+                    dragStarted.current = true;
+                    onDragStart();
+                }
+            }
+
+            const rect = canvas.getBoundingClientRect();
+            const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+            const y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+            raycaster.setFromCamera(new Vector2(x, y), camera);
+
+            const intersectionPoint = new Vector3();
+            raycaster.ray.intersectPlane(groundPlane.current, intersectionPoint);
+
+            if (intersectionPoint && hasMoved.current) {
+                dragPos.current.set(intersectionPoint.x, 0.5, intersectionPoint.z);
+            }
+        };
+
+        const handleGlobalPointerUp = () => {
+            setIsDragging(false);
+            onInteractionEnd(); // Re-enable OrbitControls
+
+            if (!hasMoved.current) {
+                onSelect(); // Handle click selection
+                dragPos.current.copy(targetPos.current);
+                return;
+            }
+
+            const fileIndex = Math.round(dragPos.current.x + 3.5);
+            const rankIndex = Math.round(dragPos.current.z + 3.5);
+
+            if (fileIndex >= 0 && fileIndex <= 7 && rankIndex >= 0 && rankIndex <= 7) {
+                const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+                const file = files[fileIndex];
+                const rank = 8 - rankIndex;
+                const squareName = `${file}${rank}` as Square;
+                onDragEnd(squareName);
+            } else {
+                onDragEnd(null);
+            }
+
+            dragPos.current.copy(targetPos.current);
+        };
+
+        document.addEventListener('pointermove', handleGlobalPointerMove);
+        document.addEventListener('pointerup', handleGlobalPointerUp);
+
+        return () => {
+            document.removeEventListener('pointermove', handleGlobalPointerMove);
+            document.removeEventListener('pointerup', handleGlobalPointerUp);
+        };
+    }, [isDragging, raycaster, camera, gl, onDragEnd, onDragStart, onInteractionEnd, onSelect]);
+
+    useEffect(() => {
+        if (isDragging) return;
+
         const newTarget = new Vector3(...position);
         if (!meshRef.current) return;
         startPos.current.copy(meshRef.current.position);
         targetPos.current.copy(newTarget);
+        dragPos.current.copy(newTarget);
         progress.current = 0;
         animating.current = true;
-        // Setup trail geometry (a thin plane) based on direction
+
         if (trailRef.current) {
             const dir = newTarget.clone().sub(startPos.current);
             const length = dir.length();
@@ -99,54 +190,42 @@ export const Piece = ({ type, color, position, isCaptured }: PieceProps) => {
             mat.transparent = true;
             trailRef.current.visible = true;
         }
-    }, [position]);
+    }, [position, isDragging]);
 
-    // Initialize capture velocity once
     useEffect(() => {
         if (isCaptured) {
-            // Initial upward velocity + random side velocity
             velocity.current.set(
-                (Math.random() - 0.5) * 2, // Random X
-                5, // Initial Upward Force
-                (Math.random() - 0.5) * 2  // Random Z
+                (Math.random() - 0.5) * 2,
+                5,
+                (Math.random() - 0.5) * 2
             );
         }
     }, [isCaptured]);
 
-    // Frame loop: move piece and fade trail
     useFrame((_state, delta) => {
-        // Handle capture animation
         if (isCaptured && meshRef.current) {
             timeSinceCaptured.current += delta;
             const t = timeSinceCaptured.current;
             const mat = meshRef.current.material as any;
 
-            // Phase 1: Flash Red (0s - 0.5s) - Smoother transition
             if (t < 0.8) {
                 const red = new Color('#ff0000');
-                mat.color.lerp(red, delta * 5); // Slower lerp
+                mat.color.lerp(red, delta * 5);
                 mat.emissive = new Color('#ff0000');
-                mat.emissiveIntensity = Math.min(2, t * 4); // Ramp up intensity
+                mat.emissiveIntensity = Math.min(2, t * 4);
             }
 
-            // Phase 2: Physics-based Flight (Gravity)
             if (t > 0.1) {
-                // Apply gravity
-                velocity.current.y -= delta * 8; // Gravity
-
-                // Apply velocity to position
+                velocity.current.y -= delta * 8;
                 meshRef.current.position.x += velocity.current.x * delta;
                 meshRef.current.position.y += velocity.current.y * delta;
                 meshRef.current.position.z += velocity.current.z * delta;
-
-                // Smooth Rotation
                 meshRef.current.rotateOnAxis(rotationAxis.current, delta * 5);
             }
 
-            // Phase 3: Vanish (1.5s - 2.5s)
             if (t > 1.5) {
                 mat.transparent = true;
-                const fadeProgress = (t - 1.5); // 0 to 1 over 1s
+                const fadeProgress = (t - 1.5);
                 mat.opacity = Math.max(0, 1 - fadeProgress);
                 const s = Math.max(0, 1 - fadeProgress);
                 meshRef.current.scale.set(s, s, s);
@@ -155,17 +234,22 @@ export const Piece = ({ type, color, position, isCaptured }: PieceProps) => {
             return;
         }
 
+        if (isDragging && meshRef.current && hasMoved.current) {
+            meshRef.current.position.lerp(dragPos.current, 0.3);
+            return;
+        }
+
         if (!animating.current) return;
-        progress.current += delta * 2.5; // ~0.4s duration
+        progress.current += delta * 2.5;
         if (progress.current >= 1) {
             progress.current = 1;
             animating.current = false;
         }
-        // Ease out cubic function: 1 - (1 - t)^3
+
         const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
         const lerpPos = startPos.current.clone().lerp(targetPos.current, easeOutCubic(progress.current));
         if (meshRef.current) meshRef.current.position.copy(lerpPos);
-        // Fade trail opacity while moving
+
         if (trailRef.current && trailRef.current.visible) {
             const mat = trailRef.current.material as any;
             mat.opacity = Math.max(0, mat.opacity - delta * 1.5);
@@ -175,19 +259,23 @@ export const Piece = ({ type, color, position, isCaptured }: PieceProps) => {
 
     return (
         <group>
-            {/* Trail – thin semi‑transparent plane that fades */}
             <mesh ref={trailRef} visible={false}>
                 <planeGeometry args={[1, 1]} />
                 <meshBasicMaterial color={new Color('#a0a0ff')} transparent opacity={0.6} depthWrite={false} />
             </mesh>
-            <mesh ref={meshRef} castShadow receiveShadow>
+            <mesh
+                ref={meshRef}
+                castShadow
+                receiveShadow
+                onPointerDown={handlePointerDown}
+            >
                 <latheGeometry args={[points, 32]} />
                 <meshPhysicalMaterial
                     color={materialColor}
-                    roughness={0.02} // Smoother
-                    metalness={0.1} // Slight metallic hint for reflection
-                    transmission={0.95} // More transparent
-                    thickness={1.0} // Less dense
+                    roughness={0.02}
+                    metalness={0.1}
+                    transmission={0.95}
+                    thickness={1.0}
                     clearcoat={1}
                     clearcoatRoughness={0.02}
                     ior={1.5}

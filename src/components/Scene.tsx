@@ -2,7 +2,7 @@ import { OrbitControls, Environment } from '@react-three/drei';
 import { Board } from './Board';
 import { Square } from 'chess.js';
 import { useThree } from '@react-three/fiber';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 import { PieceState } from '../hooks/useChessGame';
 
@@ -33,10 +33,17 @@ const CameraController = ({ playerColor }: { playerColor: 'w' | 'b' }) => {
 };
 
 export const Scene = ({ onMove, turn, getPossibleMoves, pieces, lastMove, checkSquare, playerColor, hintMove, attackedSquares }: SceneProps) => {
+    const [isInteracting, setIsInteracting] = useState(false);
+
     return (
         <>
             <CameraController playerColor={playerColor} />
-            <OrbitControls minPolarAngle={0} maxPolarAngle={Math.PI / 2.1} />
+            {/* Disable OrbitControls when interacting with board/pieces */}
+            <OrbitControls
+                enabled={!isInteracting}
+                minPolarAngle={0}
+                maxPolarAngle={Math.PI / 2.1}
+            />
             <ambientLight intensity={0.2} />
             <pointLight position={[10, 10, 10]} intensity={1.5} castShadow />
             <Environment preset="forest" background blur={0.5} />
@@ -50,6 +57,7 @@ export const Scene = ({ onMove, turn, getPossibleMoves, pieces, lastMove, checkS
                 checkSquare={checkSquare}
                 hintMove={hintMove}
                 attackedSquares={attackedSquares}
+                onInteractionChange={setIsInteracting}
             />
         </>
     );

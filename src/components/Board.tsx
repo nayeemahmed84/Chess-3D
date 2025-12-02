@@ -13,11 +13,13 @@ interface BoardProps {
     pieces: PieceState[];
     hintMove: { from: Square; to: Square } | null;
     attackedSquares: Square[];
+    onInteractionChange: (isInteracting: boolean) => void;
 }
 
-export const Board = ({ onMove, turn, getPossibleMoves, pieces, lastMove, checkSquare, hintMove, attackedSquares }: BoardProps) => {
+export const Board = ({ onMove, turn, getPossibleMoves, pieces, lastMove, checkSquare, hintMove, attackedSquares, onInteractionChange }: BoardProps) => {
     const [selectedSquare, setSelectedSquare] = useState<Square | null>(null);
     const [possibleMoves, setPossibleMoves] = useState<string[]>([]);
+    const [draggedPiece, setDraggedPiece] = useState<{ id: string, type: string, color: string, startSquare: Square } | null>(null);
 
     const squares = useMemo(() => {
         const sqs = [];
@@ -71,6 +73,32 @@ export const Board = ({ onMove, turn, getPossibleMoves, pieces, lastMove, checkS
             setSelectedSquare(null);
             setPossibleMoves([]);
         }
+    };
+
+    const handlePieceInteractionStart = () => {
+        onInteractionChange(true);
+    };
+
+    const handlePieceInteractionEnd = () => {
+        onInteractionChange(false);
+    };
+
+    const handleDragStart = (piece: { id: string, type: string, color: string, square: Square }) => {
+        if (piece.color !== turn) return;
+        // onInteractionChange(true); // Handled by onInteractionStart
+        setDraggedPiece({ ...piece, startSquare: piece.square });
+        setSelectedSquare(piece.square);
+        setPossibleMoves(getPossibleMoves(piece.square));
+    };
+
+    const handleDragEnd = (_pieceId: string, endSquare: Square | null) => {
+        if (draggedPiece && endSquare && possibleMoves.includes(endSquare)) {
+            onMove(draggedPiece.startSquare, endSquare);
+        }
+        setDraggedPiece(null);
+        setSelectedSquare(null);
+        setPossibleMoves([]);
+        // onInteractionChange(false); // Handled by onInteractionEnd
     };
 
     return (
@@ -179,10 +207,17 @@ export const Board = ({ onMove, turn, getPossibleMoves, pieces, lastMove, checkS
                 return (
                     <Piece
                         key={p.id} // Stable ID for animation
+                        id={p.id}
                         type={p.type}
                         color={p.color}
                         position={[x, 0.05, z]}
+                        square={p.square}
                         isCaptured={p.isCaptured}
+                        onDragStart={() => handleDragStart(p)}
+                        onDragEnd={(endSquare) => handleDragEnd(p.id, endSquare)}
+                        onSelect={() => handleSquareClick(p.square)}
+                        onInteractionStart={handlePieceInteractionStart}
+                        onInteractionEnd={handlePieceInteractionEnd}
                     />
                 );
             })}
