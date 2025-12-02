@@ -1,123 +1,179 @@
-import { Chess, Move } from 'chess.js';
+import { Chess } from 'chess.js';
 
-export type Difficulty = 'Easy' | 'Medium' | 'Hard';
+// Stockfish.js exports a Worker, not a function
+// We need to instantiate it as a Web Worker
+const wasmSupported = typeof WebAssembly === 'object' && WebAssembly.validate(Uint8Array.of(0x0, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00));
 
-const PIECE_VALUES: Record<string, number> = {
-    p: 1,
-    n: 3,
-    b: 3,
-    r: 5,
-    q: 9,
-    k: 0,
-};
+// @ts-ignore
+const stockfish = new Worker(
+    new URL(
+        wasmSupported
+            ? '../../../node_modules/stockfish.js/stockfish.wasm.js'
+            : '../../../node_modules/stockfish.js/stockfish.js',
+        import.meta.url
+    )
+);
 
-const evaluateBoard = (game: Chess): number => {
-    let score = 0;
-    const board = game.board();
-    for (const row of board) {
-        for (const piece of row) {
-            if (piece) {
-                const value = PIECE_VALUES[piece.type] || 0;
-                score += piece.color === 'w' ? value : -value;
-            }
-        }
+console.log('[Worker] Stockfish instance created');
+
+// State for analysis
+interface AnalysisState {
+    fen: string;
+    playedMove: string; // UCI
+    playedMoveSan: string; // SAN for reporting back
+    bestMove?: string;
+    bestScore?: number; // centipawns
+    playedScore?: number;
+    step: 'find_best' | 'eval_played';
+}
+
+let pendingAnalysis: AnalysisState | null = null;
+let pendingRequestType: 'move' | 'hint' | null = null; // Track what kind of request we're handling
+
+const parseScore = (line: string): number | null => {
+    const parts = line.split(' ');
+    const scoreIndex = parts.indexOf('score');
+    if (scoreIndex !== -1) {
+        const type = parts[scoreIndex + 1];
+        const val = parseInt(parts[scoreIndex + 2]);
+        if (type === 'cp') return val;
+        if (type === 'mate') return val > 0 ? 10000 : -10000;
     }
-    return score;
-};
-
-const minimax = (game: Chess, depth: number, isMaximizingPlayer: boolean): number => {
-    if (depth === 0 || game.isGameOver()) {
-        return evaluateBoard(game);
-    }
-
-    const moves = game.moves();
-
-    if (isMaximizingPlayer) {
-        let maxEval = -Infinity;
-        for (const move of moves) {
-            game.move(move);
-            const evalScore = minimax(game, depth - 1, false);
-            game.undo();
-            maxEval = Math.max(maxEval, evalScore);
-        }
-        return maxEval;
-    } else {
-        let minEval = Infinity;
-        for (const move of moves) {
-            game.move(move);
-            const evalScore = minimax(game, depth - 1, true);
-            game.undo();
-            minEval = Math.min(minEval, evalScore);
-        }
-        return minEval;
-    }
-};
-
-const getBestMove = (game: Chess, difficulty: Difficulty): string | Move | null => {
-    const possibleMoves = game.moves({ verbose: true });
-    if (possibleMoves.length === 0) return null;
-
-    if (difficulty === 'Easy') {
-        return possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
-    }
-
-    if (difficulty === 'Medium') {
-        // Prioritize captures
-        const captures = possibleMoves.filter(move => move.captured);
-        if (captures.length > 0) {
-            captures.sort((a, b) => {
-                const valA = PIECE_VALUES[a.captured || 'p'] || 0;
-                const valB = PIECE_VALUES[b.captured || 'p'] || 0;
-                return valB - valA;
-            });
-            return captures[0];
-        }
-        return possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
-    }
-
-    if (difficulty === 'Hard') {
-        // Minimax depth 3
-        const isWhiteTurn = game.turn() === 'w';
-        let bestMoveFound = null;
-
-        if (isWhiteTurn) {
-            let maxEval = -Infinity;
-            for (const move of possibleMoves) {
-                game.move(move);
-                const evalScore = minimax(game, 2, false); // Depth 2 recursive calls
-                game.undo();
-                if (evalScore > maxEval) {
-                    maxEval = evalScore;
-                    bestMoveFound = move;
-                }
-            }
-        } else {
-            let minEval = Infinity;
-            for (const move of possibleMoves) {
-                game.move(move);
-                const evalScore = minimax(game, 2, true); // Depth 2 recursive calls
-                game.undo();
-                if (evalScore < minEval) {
-                    minEval = evalScore;
-                    bestMoveFound = move;
-                }
-            }
-        }
-
-        return bestMoveFound || possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
-    }
-
     return null;
 };
 
-self.onmessage = (e: MessageEvent) => {
-    const { fen, difficulty, type } = e.data;
-    const game = new Chess(fen);
+const parseAnalysisInfo = (line: string) => {
+    if (!pendingAnalysis) return;
 
-    if (e.data.pgn) {
-        game.loadPgn(e.data.pgn);
+    const score = parseScore(line);
+    if (score !== null) {
+        if (pendingAnalysis.step === 'find_best') {
+            pendingAnalysis.bestScore = score;
+        } else {
+            pendingAnalysis.playedScore = score;
+        }
+    }
+};
+
+const handleBestMove = (line: string) => {
+    const parts = line.split(' ');
+    const move = parts[1]; // UCI move (e.g. e2e4)
+
+    if (pendingAnalysis) {
+        if (pendingAnalysis.step === 'find_best') {
+            pendingAnalysis.bestMove = move;
+            pendingAnalysis.step = 'eval_played';
+
+            if (pendingAnalysis.playedMove === move) {
+                pendingAnalysis.playedScore = pendingAnalysis.bestScore;
+                finishAnalysis();
+                return;
+            }
+
+            stockfish.postMessage(`position fen ${pendingAnalysis.fen}`);
+            stockfish.postMessage(`go depth 10 searchmoves ${pendingAnalysis.playedMove}`);
+        } else {
+            finishAnalysis();
+        }
+        return;
     }
 
-    const bestMove = getBestMove(game, difficulty);
-    self.postMessage({ type, move: bestMove });
+    // Normal move/hint request
+    const responseType = pendingRequestType || 'move';
+    console.log('[Worker] Sending response type:', responseType, 'move:', move);
+    self.postMessage({ type: responseType, move });
+    pendingRequestType = null; // Reset after sending
+};
+
+const finishAnalysis = () => {
+    if (!pendingAnalysis) return;
+
+    const { bestScore, playedScore, playedMoveSan } = pendingAnalysis;
+
+    let annotation = '';
+    if (bestScore !== undefined && playedScore !== undefined) {
+        const diff = bestScore - playedScore;
+
+        if (diff > 300) {
+            annotation = '??';
+        } else if (diff > 100) {
+            annotation = '?';
+        } else if (diff > 50) {
+            annotation = '?!';
+        }
+    }
+
+    self.postMessage({
+        type: 'analysis',
+        moveSan: playedMoveSan,
+        annotation
+    });
+
+    pendingAnalysis = null;
+};
+
+// Listen to Stockfish output
+stockfish.addEventListener('message', (e) => {
+    const line = e.data;
+    console.log('[Worker] Stockfish output:', line);
+
+    if (line.startsWith('info') && pendingAnalysis) {
+        parseAnalysisInfo(line);
+    }
+
+    if (line.startsWith('bestmove')) {
+        handleBestMove(line);
+    }
+});
+
+// Initialize Stockfish
+console.log('[Worker] Sending UCI init command');
+stockfish.postMessage('uci');
+
+// Listen to messages from main thread
+self.onmessage = (e: MessageEvent) => {
+    console.log('[Worker] Received message from main thread:', e.data);
+    const { type, fen, move, difficulty } = e.data;
+
+    if (type === 'init') {
+        return;
+    }
+
+    if (type === 'move' || type === 'hint') {
+        pendingAnalysis = null;
+        pendingRequestType = type;
+        stockfish.postMessage(`position fen ${fen}`);
+
+        let depth = 10;
+        if (difficulty === 'Easy') depth = 1;
+        if (difficulty === 'Medium') depth = 5;
+        if (difficulty === 'Hard') depth = 15;
+
+        console.log('[Worker] Requesting move/hint at depth', depth);
+        stockfish.postMessage(`go depth ${depth}`);
+    }
+
+    if (type === 'analyze') {
+        const game = new Chess(fen);
+        let uciMove = move;
+        try {
+            const m = game.move(move);
+            if (m) {
+                uciMove = m.from + m.to + (m.promotion || '');
+            }
+        } catch (e) {
+            console.error('[Worker] Failed to convert move to UCI:', e);
+        }
+
+        pendingAnalysis = {
+            fen,
+            playedMove: uciMove,
+            playedMoveSan: move,
+            step: 'find_best'
+        };
+
+        console.log('[Worker] Starting analysis for move:', move);
+        stockfish.postMessage(`position fen ${fen}`);
+        stockfish.postMessage(`go depth 10`);
+    }
 };

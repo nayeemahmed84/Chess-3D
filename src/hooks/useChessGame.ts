@@ -77,6 +77,7 @@ export const useChessGame = () => {
     const [showThreats, setShowThreats] = useState(false);
     const [attackedSquares, setAttackedSquares] = useState<Square[]>([]);
     const [hasSavedGame, setHasSavedGame] = useState(false);
+    const [annotations, setAnnotations] = useState<Record<number, string>>({});
 
     // Volume state
     const [volume, setVolume] = useState(1);
@@ -97,6 +98,8 @@ export const useChessGame = () => {
         setWorker(newWorker);
         return () => newWorker.terminate();
     }, []);
+
+
 
     // Audio assets are imported at the top of the file
 
@@ -314,13 +317,99 @@ export const useChessGame = () => {
                         setWinner('Draw');
                     }
                 }
+
+                if (worker) {
+                    worker.postMessage({
+                        fen: game.fen(), // State before move
+                        move: move.san,
+                        type: 'analyze'
+                    });
+                }
+
                 return true;
             }
         } catch (e) {
             return false;
         }
         return false;
-    }, [game]);
+    }, [game, worker]);
+
+    const handleWorkerMessage = useCallback((e: MessageEvent) => {
+        console.log('Main thread received from worker:', e.data);
+        const { type, move: bestMove, moveSan, annotation } = e.data;
+
+        if (type === 'analysis') {
+            if (moveSan && annotation) {
+                setAnnotations(prev => ({
+                    ...prev,
+                    [game.history().length - 1]: annotation
+                }));
+            }
+            return;
+        }
+
+        if (type === 'hint') {
+            if (bestMove) {
+                let from: Square | undefined;
+                let to: Square | undefined;
+
+                if (typeof bestMove === 'string') {
+                    if (bestMove.length >= 4) {
+                        from = bestMove.substring(0, 2) as Square;
+                        to = bestMove.substring(2, 4) as Square;
+                    }
+                } else if (typeof bestMove === 'object') {
+                    from = bestMove.from;
+                    to = bestMove.to;
+                }
+
+                if (from && to) {
+                    setHintMove({ from, to });
+                }
+            }
+            return;
+        }
+
+        if (type === 'move') {
+            if (bestMove) {
+                // Only process AI moves when it's actually the AI's turn
+                // This prevents the AI from playing both sides
+                if (game.turn() === playerColor) {
+                    console.log('[Hook] Ignoring AI move - it is the player\'s turn');
+                    return;
+                }
+
+                let from: Square | undefined;
+                let to: Square | undefined;
+                let promotion = 'q';
+
+                if (typeof bestMove === 'string') {
+                    if (bestMove.length >= 4) {
+                        from = bestMove.substring(0, 2) as Square;
+                        to = bestMove.substring(2, 4) as Square;
+                        if (bestMove.length === 5) {
+                            promotion = bestMove[4];
+                        }
+                    }
+                } else if (typeof bestMove === 'object') {
+                    from = bestMove.from;
+                    to = bestMove.to;
+                    promotion = bestMove.promotion || 'q';
+                }
+
+                if (from && to) {
+                    console.log('[Hook] Making AI move:', from, to);
+                    makeMove(from, to, promotion, true);
+                }
+            }
+        }
+    }, [game, makeMove]);
+
+    useEffect(() => {
+        if (worker) {
+            worker.onmessage = handleWorkerMessage;
+        }
+    }, [worker, handleWorkerMessage]);
 
     // Calculate attacked squares whenever game state changes or showThreats changes
     useEffect(() => {
@@ -467,45 +556,7 @@ export const useChessGame = () => {
             difficulty,
             type: 'move'
         });
-
-        // Handle response
-        worker.onmessage = (e) => {
-            const { type, move: bestMove } = e.data;
-
-            if (type === 'hint') {
-                if (bestMove) {
-                    if (typeof bestMove === 'object') {
-                        setHintMove({ from: bestMove.from, to: bestMove.to });
-                    } else if (typeof bestMove === 'string') {
-                        // Parse SAN string if needed, but worker usually returns move object or string
-                        // If string, we need to find from/to. 
-                        // Ideally worker returns Move object. 
-                        // Let's assume it returns object or we handle string via game.move() dry run
-                        const tempGame = new Chess(game.fen());
-                        const m = tempGame.move(bestMove);
-                        if (m) {
-                            setHintMove({ from: m.from, to: m.to });
-                        }
-                    }
-                }
-                return;
-            }
-
-            if (type === 'move') {
-                if (bestMove) {
-                    if (typeof bestMove === 'object') {
-                        makeMove(bestMove.from, bestMove.to, bestMove.promotion || 'q', true);
-                    } else if (typeof bestMove === 'string') {
-                        const move = game.move(bestMove);
-                        game.undo();
-                        if (move) {
-                            makeMove(move.from, move.to, move.promotion, true);
-                        }
-                    }
-                }
-            }
-        };
-    }, [game, playerColor, isGameOver, worker, difficulty, makeMove]);
+    }, [game, playerColor, isGameOver, worker, difficulty]);
 
     // AI Move Effect - White always moves first (standard chess)
     useEffect(() => {
@@ -665,6 +716,7 @@ export const useChessGame = () => {
         toggleMute,
         saveGame,
         loadGame,
-        hasSavedGame
+        hasSavedGame,
+        annotations
     };
 };
