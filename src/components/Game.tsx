@@ -44,7 +44,8 @@ const Game = () => {
         hintMove, showHint, showThreats, setShowThreats, attackedSquares, requestHint,
         volume, setVolume, isMuted, toggleMute,
         saveGame, loadGame, deleteSave, hasSavedGame, game, navigateToMove, importPGN,
-        gameMode, setGameMode, capturedPieces, materialAdvantage, initialTime, setInitialTime
+        gameMode, setGameMode, capturedPieces, materialAdvantage, initialTime, setInitialTime,
+        opening
     } = useChessGame();
 
     const [isPanelVisible, setIsPanelVisible] = useState(true);
@@ -71,6 +72,18 @@ const Game = () => {
         const secs = Math.floor(seconds % 60);
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
+
+    // Auto-hide panel after first move
+    useEffect(() => {
+        // Check for length <= 2 to catch case where AI moves immediately (length jumps 0 -> 2)
+        if (history.length > 0 && history.length <= 2 && isPanelVisible) {
+            // Small delay to let user see the move, then hide panel
+            const timer = setTimeout(() => {
+                setIsPanelVisible(false);
+            }, 1000);
+            return () => clearTimeout(timer);
+        }
+    }, [history.length, isPanelVisible]);
 
     // Keyboard shortcuts
     useEffect(() => {
@@ -387,6 +400,22 @@ const Game = () => {
                         </div>
                     </div>
                 </div>
+
+                {/* Opening Display */}
+                {opening && (
+                    <div style={{
+                        marginBottom: '16px',
+                        padding: '8px 12px',
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '8px',
+                        textAlign: 'center'
+                    }}>
+                        <div style={{ fontSize: '10px', opacity: 0.6, marginBottom: '2px' }}>Opening</div>
+                        <div style={{ fontSize: '13px', fontWeight: 500 }}>{opening.name}</div>
+                        <div style={{ fontSize: '10px', opacity: 0.5, marginTop: '2px' }}>{opening.eco}</div>
+                    </div>
+                )}
 
                 <div style={{ marginBottom: '16px' }}>
                     <label style={{ display: 'block', fontSize: '12px', color: 'rgba(255,255,255,0.6)', marginBottom: '4px' }}>Game Mode</label>

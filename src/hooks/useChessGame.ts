@@ -3,6 +3,7 @@ import { Chess, Square, Move } from 'chess.js';
 import moveSoundUrl from '../assets/sounds/move.mp3';
 import captureSoundUrl from '../assets/sounds/capture.mp3';
 import checkmateSoundUrl from '../assets/sounds/checkmate.mp3';
+import { openings, normalizeFen } from '../data/openings';
 
 export interface PieceState {
     id: string;
@@ -59,18 +60,18 @@ const evaluateBoard = (game: Chess): number => {
 
 
 
-export const useChessGame = () => {
+export const useChessGame = (gameModeProp: 'local' | 'ai' = 'ai') => {
     const [game, setGame] = useState(new Chess());
     const [fen, setFen] = useState(game.fen());
-    const [turn, setTurn] = useState(game.turn());
+    const [turn, setTurn] = useState<'w' | 'b'>('w');
     const [isGameOver, setIsGameOver] = useState(false);
     const [winner, setWinner] = useState<string | null>(null);
     const [pieces, setPieces] = useState<PieceState[]>([]);
-    const [difficulty, setDifficulty] = useState<Difficulty>('Easy');
-    const [gameMode, setGameMode] = useState<GameMode>('ai');
+    const [difficulty, setDifficulty] = useState<Difficulty>('Medium');
     const [history, setHistory] = useState<string[]>([]);
     const [undoneMoves, setUndoneMoves] = useState<string[]>([]); // Stack for redo
-    const [evaluation, setEvaluation] = useState(0);
+    const [evaluation, setEvaluation] = useState(0); // Centipawns
+    const [opening, setOpening] = useState<{ name: string, eco: string } | null>(null);
 
     // Gameplay improvements state
     const [promotionPending, setPromotionPending] = useState<{ from: Square; to: Square; color: 'w' | 'b' } | null>(null);
@@ -86,7 +87,7 @@ export const useChessGame = () => {
     const [materialAdvantage, setMaterialAdvantage] = useState(0);
 
     // Volume state
-    const [volume, setVolume] = useState(1);
+    const [volume, setVolume] = useState(1.0);
     const [isMuted, setIsMuted] = useState(false);
 
     // Timer state (in seconds) - Default 10 minutes
@@ -94,6 +95,8 @@ export const useChessGame = () => {
     const [whiteTime, setWhiteTime] = useState(600);
     const [blackTime, setBlackTime] = useState(600);
     const [timerActive, setTimerActive] = useState(false);
+
+    const [gameMode, setGameMode] = useState<GameMode>(gameModeProp);
 
     // Play as Black state
     const [playerColor, setPlayerColor] = useState<'w' | 'b'>('w');
@@ -360,14 +363,6 @@ export const useChessGame = () => {
                     }
                 }
 
-                if (worker) {
-                    worker.postMessage({
-                        fen: game.fen(), // State before move
-                        move: move.san,
-                        type: 'analyze'
-                    });
-                }
-
                 return true;
             }
         } catch (e) {
@@ -378,6 +373,8 @@ export const useChessGame = () => {
 
     const handleWorkerMessage = useCallback((e: MessageEvent) => {
         const { type, move, data } = e.data;
+
+        console.log('[useChessGame] Worker message received:', { type, move, data });
 
         if (type === 'evaluation') {
             // data.value is in centipawns (e.g. 100 = 1 pawn)
@@ -411,6 +408,7 @@ export const useChessGame = () => {
         }
 
         if (type === 'bestmove') {
+            console.log('[useChessGame] Best move received:', move, 'Current turn:', game.turn(), 'Player color:', playerColor, 'Game mode:', gameMode);
             // move is string like "e2e4" or "a7a8q"
             if (move) {
                 const from = move.substring(0, 2) as Square;
@@ -424,6 +422,7 @@ export const useChessGame = () => {
                     }
                 } else if (gameMode === 'ai') {
                     // AI Turn - make the move
+                    console.log('[useChessGame] Making AI move from', from, 'to', to);
                     makeMove(from, to, promotion || 'q', true);
                 }
             }
@@ -463,6 +462,20 @@ export const useChessGame = () => {
         }
         setAttackedSquares(squares);
     }, [game, showThreats, fen]);
+
+    // Opening detection - update opening name based on current position
+    useEffect(() => {
+        const currentFen = normalizeFen(fen);
+        const detectedOpening = openings[currentFen];
+
+        if (detectedOpening) {
+            setOpening(detectedOpening);
+        } else if (game.history().length === 0) {
+            // Reset opening at start
+            setOpening(null);
+        }
+        // Keep the last detected opening if current position not in database
+    }, [fen, game]);
 
     const requestHint = useCallback(() => {
         setShowHint(prev => !prev);
@@ -945,6 +958,7 @@ export const useChessGame = () => {
         navigateToMove,
         importPGN,
         initialTime,
-        setInitialTime
+        setInitialTime,
+        opening
     };
 };

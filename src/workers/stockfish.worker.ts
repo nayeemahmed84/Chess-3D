@@ -56,7 +56,7 @@ function initializeEngine() {
 
         engine.onmessage = (e: MessageEvent) => {
             const line = e.data;
-            // console.log('[Stockfish Engine]', line); // Uncomment for verbose logs
+            console.log('[Stockfish Engine]', line); // Verbose logs enabled for debugging
 
             if (typeof line !== 'string') return;
 
