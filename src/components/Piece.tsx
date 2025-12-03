@@ -89,6 +89,7 @@ export const Piece = ({ type, color, position, isCaptured, onDragStart, onDragEn
         hasMoved.current = false;
         dragStarted.current = false;
         setIsDragging(true);
+        document.body.style.cursor = 'grabbing';
     };
 
     useEffect(() => {
@@ -126,6 +127,7 @@ export const Piece = ({ type, color, position, isCaptured, onDragStart, onDragEn
         const handleGlobalPointerUp = () => {
             setIsDragging(false);
             onInteractionEnd(); // Re-enable OrbitControls
+            document.body.style.cursor = 'auto';
 
             if (!hasMoved.current) {
                 onSelect(); // Handle click selection
@@ -259,6 +261,8 @@ export const Piece = ({ type, color, position, isCaptured, onDragStart, onDragEn
                 castShadow
                 receiveShadow
                 onPointerDown={handlePointerDown}
+                onPointerEnter={() => !isCaptured && (document.body.style.cursor = 'grab')}
+                onPointerLeave={() => !isDragging && (document.body.style.cursor = 'auto')}
                 geometry={geometry}
                 scale={[scale, scale, scale]}
                 rotation={[0, rotationY, 0]}
