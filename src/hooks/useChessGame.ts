@@ -81,7 +81,7 @@ export const useChessGame = () => {
     const [showThreats, setShowThreats] = useState(false);
     const [attackedSquares, setAttackedSquares] = useState<Square[]>([]);
     const [hasSavedGame, setHasSavedGame] = useState(false);
-    const [annotations, setAnnotations] = useState<Record<number, string>>({});
+
     const [capturedPieces, setCapturedPieces] = useState<{ white: string[], black: string[] }>({ white: [], black: [] });
     const [materialAdvantage, setMaterialAdvantage] = useState(0);
 
@@ -101,9 +101,13 @@ export const useChessGame = () => {
 
     // Initialize Web Worker
     useEffect(() => {
-        const newWorker = new Worker(new URL('../workers/ai.worker.ts', import.meta.url), { type: 'module' });
+        const newWorker = new Worker(new URL('../workers/stockfish.worker.ts', import.meta.url), { type: 'module' });
+        newWorker.postMessage({ type: 'init' });
         setWorker(newWorker);
-        return () => newWorker.terminate();
+        return () => {
+            newWorker.postMessage({ type: 'quit' });
+            newWorker.terminate();
+        };
     }, []);
 
 
@@ -373,82 +377,58 @@ export const useChessGame = () => {
     }, [game, worker]);
 
     const handleWorkerMessage = useCallback((e: MessageEvent) => {
-        console.log('Main thread received from worker:', e.data);
-        const { type, move: bestMove, moveSan, annotation } = e.data;
+        const { type, move, data } = e.data;
 
-        if (type === 'analysis') {
-            if (moveSan && annotation) {
-                setAnnotations(prev => ({
-                    ...prev,
-                    [game.history().length - 1]: annotation
-                }));
+        if (type === 'evaluation') {
+            // data.value is in centipawns (e.g. 100 = 1 pawn)
+            // If it's mate, value might be different or handled separately in parsing
+            // For now assuming cp
+            if (data.type === 'cp') {
+                // normalize to -20 to +20 range roughly for the bar
+                // The bar expects roughly -20 to +20? 
+                // Existing evaluateBoard returns material difference (e.g. +1, +3).
+                // Stockfish returns centipawns (e.g. +100, +300).
+                // So we divide by 100.
+                let evalScore = data.value / 100;
+
+                // Stockfish evaluation is usually from side-to-move perspective.
+                // We need it from White's perspective.
+                if (game.turn() === 'b') {
+                    evalScore = -evalScore;
+                }
+
+                setEvaluation(evalScore);
+            } else if (data.type === 'mate') {
+                // Mate in X
+                // If positive, side to move wins.
+                let evalScore = data.value > 0 ? 100 : -100;
+                if (game.turn() === 'b') {
+                    evalScore = -evalScore;
+                }
+                setEvaluation(evalScore);
             }
             return;
         }
 
-        if (type === 'hint') {
-            if (bestMove) {
-                let from: Square | undefined;
-                let to: Square | undefined;
+        if (type === 'bestmove') {
+            // move is string like "e2e4" or "a7a8q"
+            if (move) {
+                const from = move.substring(0, 2) as Square;
+                const to = move.substring(2, 4) as Square;
+                const promotion = move.length === 5 ? move[4] : undefined;
 
-                if (typeof bestMove === 'string') {
-                    if (bestMove.length >= 4) {
-                        from = bestMove.substring(0, 2) as Square;
-                        to = bestMove.substring(2, 4) as Square;
-                    }
-                } else if (typeof bestMove === 'object') {
-                    from = bestMove.from;
-                    to = bestMove.to;
-                }
-
-                if (from && to) {
-                    // Validate that the hint is legal for the current board state
-                    // This prevents stale hints from showing up
-                    const piece = game.get(from);
-                    if (piece && piece.color === game.turn()) {
-                        setHintMove({ from, to });
-                    } else {
-                        console.warn('[Hook] Ignored invalid hint:', from, to, 'Piece:', piece);
-                    }
-                }
-            }
-            return;
-        }
-
-        if (type === 'move') {
-            if (bestMove) {
-                // Only process AI moves when it's actually the AI's turn
-                // This prevents the AI from playing both sides
+                // If it's player's turn and we have a hint, update hint
                 if (game.turn() === playerColor || gameMode === 'local') {
-                    console.log('[Hook] Ignoring AI move - it is the player\'s turn or local mode');
-                    return;
-                }
-
-                let from: Square | undefined;
-                let to: Square | undefined;
-                let promotion = 'q';
-
-                if (typeof bestMove === 'string') {
-                    if (bestMove.length >= 4) {
-                        from = bestMove.substring(0, 2) as Square;
-                        to = bestMove.substring(2, 4) as Square;
-                        if (bestMove.length === 5) {
-                            promotion = bestMove[4];
-                        }
+                    if (showHint) {
+                        setHintMove({ from, to });
                     }
-                } else if (typeof bestMove === 'object') {
-                    from = bestMove.from;
-                    to = bestMove.to;
-                    promotion = bestMove.promotion || 'q';
-                }
-
-                if (from && to) {
-                    console.log('[Hook] Making AI move:', from, to);
-                    makeMove(from, to, promotion, true);
+                } else if (gameMode === 'ai') {
+                    // AI Turn - make the move
+                    makeMove(from, to, promotion || 'q', true);
                 }
             }
         }
-    }, [game, makeMove]);
+    }, [game, makeMove, playerColor, gameMode, showHint]);
 
     useEffect(() => {
         if (worker) {
@@ -490,17 +470,20 @@ export const useChessGame = () => {
 
     // Auto-update hint when game state changes or showHint is toggled
     useEffect(() => {
-        if (showHint && !isGameOver && worker && (gameMode === 'local' || game.turn() === playerColor)) {
-            worker.postMessage({
-                fen: game.fen(),
-                pgn: game.pgn(),
-                difficulty: 'Hard',
-                type: 'hint'
-            });
+        if (showHint && !isGameOver && worker) {
+            // Construct moves string for UCI
+            const moves = game.history({ verbose: true }).map(m => {
+                let moveStr = m.from + m.to;
+                if (m.promotion) moveStr += m.promotion;
+                return moveStr;
+            }).join(' ');
+
+            worker.postMessage({ type: 'position', data: `startpos moves ${moves}` });
+            worker.postMessage({ type: 'go', data: 'depth 15' }); // High depth for hint
         } else {
             setHintMove(null);
         }
-    }, [showHint, game, isGameOver, worker, playerColor]);
+    }, [showHint, game, isGameOver, worker]);
 
     const onPromotionSelect = useCallback((pieceType: string) => {
         if (promotionPending) {
@@ -635,18 +618,42 @@ export const useChessGame = () => {
 
     const makeAIMove = useCallback(() => {
         if (game.turn() === playerColor || isGameOver || !worker || gameMode === 'local') {
-            console.log('[makeAIMove] Skipped. Turn:', game.turn(), 'Player:', playerColor, 'GameOver:', isGameOver, 'Worker:', !!worker, 'Mode:', gameMode);
             return;
         }
 
-        console.log('[makeAIMove] Posting message to worker...');
-        // Post message to worker
-        worker.postMessage({
-            fen: game.fen(),
-            pgn: game.pgn(),
-            difficulty,
-            type: 'move'
-        });
+        // Construct moves string for UCI
+        const moves = game.history({ verbose: true }).map(m => {
+            let moveStr = m.from + m.to;
+            if (m.promotion) moveStr += m.promotion;
+            return moveStr;
+        }).join(' ');
+
+        worker.postMessage({ type: 'position', data: `startpos moves ${moves}` });
+
+        // Determine depth/time based on difficulty
+        let depth = 5;
+        let movetime = 1000;
+
+        switch (difficulty) {
+            case 'Easy':
+                depth = 2;
+                movetime = 500;
+                break;
+            case 'Medium':
+                depth = 8;
+                movetime = 2000;
+                break;
+            case 'Hard':
+                depth = 15; // Strong but fast enough
+                movetime = 5000;
+                break;
+        }
+
+        // We can use 'go depth X' or 'go movetime Y'
+        // Using depth is more consistent for difficulty, movetime is better for UX.
+        // Let's use depth for now as it's a proxy for skill.
+        worker.postMessage({ type: 'go', data: `depth ${depth} movetime ${movetime}` });
+
     }, [game, playerColor, isGameOver, worker, difficulty, gameMode]);
 
     // AI Move Effect - White always moves first (standard chess)
@@ -934,7 +941,7 @@ export const useChessGame = () => {
         loadGame,
         deleteSave,
         hasSavedGame,
-        annotations,
+
         navigateToMove,
         importPGN,
         initialTime,
