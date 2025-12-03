@@ -149,12 +149,20 @@ const Game = () => {
                     e.preventDefault();
                     setShowThreats(!showThreats);
                     break;
+                case 'f':
+                    e.preventDefault();
+                    toggleFullscreen();
+                    break;
+                case 'p':
+                    e.preventDefault();
+                    setIsPanelVisible(!isPanelVisible);
+                    break;
             }
         };
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [undoMove, redoMove, requestHint, resetGame, saveGame, loadGame, hasSavedGame, showThreats, setShowThreats, promotionPending, notification]);
+    }, [undoMove, redoMove, requestHint, resetGame, saveGame, loadGame, hasSavedGame, showThreats, setShowThreats, promotionPending, notification, toggleFullscreen, isPanelVisible]);
 
 
 
@@ -248,7 +256,7 @@ const Game = () => {
                         e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
                         e.currentTarget.style.transform = 'scale(1)';
                     }}
-                    title="Show Panel"
+                    title="Show Panel (P)"
                 >
                     <ChevronRight size={20} color="white" />
                 </button>
@@ -305,7 +313,7 @@ const Game = () => {
                     onMouseOut={(e) => {
                         e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
                     }}
-                    title="Hide Panel"
+                    title="Hide Panel (P)"
                 >
                     <ChevronLeft size={16} />
                 </button>
@@ -333,7 +341,7 @@ const Game = () => {
                     onMouseOut={(e) => {
                         e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
                     }}
-                    title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+                    title={isFullscreen ? "Exit Fullscreen (F)" : "Enter Fullscreen (F)"}
                 >
                     {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
                 </button>
@@ -553,7 +561,7 @@ const Game = () => {
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
                     <button
                         onClick={undoMove}
-                        title="Undo Move"
+                        title="Undo Move (←)"
                         style={{
                             flex: 1, padding: '8px', cursor: 'pointer',
                             background: 'rgba(255, 255, 255, 0.1)', color: 'white',
@@ -565,7 +573,7 @@ const Game = () => {
                     </button>
                     <button
                         onClick={redoMove}
-                        title="Redo Move"
+                        title="Redo Move (→)"
                         style={{
                             flex: 1, padding: '8px', cursor: 'pointer',
                             background: 'rgba(255, 255, 255, 0.1)', color: 'white',
@@ -581,7 +589,7 @@ const Game = () => {
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
                     <button
                         onClick={requestHint}
-                        title="Get a Hint"
+                        title="Get a Hint (H)"
                         style={{
                             flex: 1, padding: '8px', cursor: 'pointer',
                             background: showHint ? 'rgba(255, 215, 0, 0.5)' : 'rgba(255, 215, 0, 0.2)',
@@ -597,7 +605,7 @@ const Game = () => {
                     </button>
                     <button
                         onClick={() => setShowThreats(!showThreats)}
-                        title="Toggle Threat Indicators"
+                        title="Toggle Threat Indicators (T)"
                         style={{
                             flex: 1, padding: '8px', cursor: 'pointer',
                             background: showThreats ? 'rgba(255, 50, 50, 0.3)' : 'rgba(255, 255, 255, 0.1)',
@@ -615,7 +623,7 @@ const Game = () => {
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
                     <button
                         onClick={() => setSaveLoadMode('save')}
-                        title="Save Game"
+                        title="Save Game (S)"
                         style={{
                             flex: 1, padding: '8px', cursor: 'pointer',
                             background: 'rgba(255, 255, 255, 0.1)', color: 'white',
@@ -629,7 +637,7 @@ const Game = () => {
                     </button>
                     <button
                         onClick={() => setSaveLoadMode('load')}
-                        title="Load Game"
+                        title="Load Game (L)"
                         style={{
                             flex: 1, padding: '8px', cursor: hasSavedGame ? 'pointer' : 'not-allowed',
                             background: hasSavedGame ? 'rgba(76, 175, 80, 0.2)' : 'rgba(255, 255, 255, 0.1)',
@@ -648,6 +656,7 @@ const Game = () => {
 
                 <button
                     onClick={resetGame}
+                    title="Reset Game (R)"
                     style={{
                         display: 'flex',
                         alignItems: 'center',
