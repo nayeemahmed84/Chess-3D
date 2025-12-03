@@ -44,7 +44,7 @@ const Game = () => {
         hintMove, showHint, showThreats, setShowThreats, attackedSquares, requestHint,
         volume, setVolume, isMuted, toggleMute,
         saveGame, loadGame, deleteSave, hasSavedGame, game, navigateToMove, importPGN,
-        gameMode, setGameMode, capturedPieces, materialAdvantage
+        gameMode, setGameMode, capturedPieces, materialAdvantage, initialTime, setInitialTime
     } = useChessGame();
 
     const [isPanelVisible, setIsPanelVisible] = useState(true);
@@ -440,6 +440,37 @@ const Game = () => {
                         </select>
                     </div>
                 )}
+
+                <div style={{ marginBottom: '16px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', color: 'rgba(255,255,255,0.6)', marginBottom: '4px' }}>Time Control</label>
+                    <select
+                        value={initialTime}
+                        onChange={(e) => {
+                            const newTime = parseInt(e.target.value);
+                            setInitialTime(newTime);
+                            // Optional: Automatically reset game or notify user that it applies to next game
+                            // For now, let's just update the state. The user has to click Reset to apply it if game is in progress.
+                        }}
+                        style={{
+                            width: '100%',
+                            padding: '8px',
+                            background: 'rgba(0, 0, 0, 0.3)',
+                            color: 'white',
+                            border: '1px solid rgba(255, 255, 255, 0.2)',
+                            borderRadius: '8px',
+                            outline: 'none',
+                            cursor: 'pointer',
+                            fontSize: '14px'
+                        }}
+                    >
+                        <option value={60}>1 min (Bullet)</option>
+                        <option value={180}>3 min (Blitz)</option>
+                        <option value={300}>5 min (Blitz)</option>
+                        <option value={600}>10 min (Rapid)</option>
+                        <option value={1800}>30 min (Classical)</option>
+                        <option value={3600}>60 min</option>
+                    </select>
+                </div>
 
                 <div style={{ marginBottom: '16px' }}>
                     <label style={{ display: 'block', fontSize: '12px', color: 'rgba(255,255,255,0.6)', marginBottom: '4px' }}>Volume</label>

@@ -31,6 +31,7 @@ interface SavedGame {
     volume: number;
     isMuted: boolean;
     gameMode: GameMode;
+    initialTime?: number;
 }
 
 const PIECE_VALUES: Record<string, number> = {
@@ -89,6 +90,7 @@ export const useChessGame = () => {
     const [isMuted, setIsMuted] = useState(false);
 
     // Timer state (in seconds) - Default 10 minutes
+    const [initialTime, setInitialTime] = useState(600);
     const [whiteTime, setWhiteTime] = useState(600);
     const [blackTime, setBlackTime] = useState(600);
     const [timerActive, setTimerActive] = useState(false);
@@ -184,6 +186,14 @@ export const useChessGame = () => {
         }
         return () => clearInterval(interval);
     }, [timerActive, turn, isGameOver]);
+
+    // Update current timers when initialTime changes (only if game hasn't started)
+    useEffect(() => {
+        if (history.length === 0 && !timerActive) {
+            setWhiteTime(initialTime);
+            setBlackTime(initialTime);
+        }
+    }, [initialTime, history.length, timerActive]);
 
     // Update pieces helper (reused for move, undo, redo)
     const syncPiecesWithBoard = (currentBoard: ReturnType<Chess['board']>) => {
@@ -670,8 +680,9 @@ export const useChessGame = () => {
         setCheckSquare(null);
         setHintMove(null);
         setPromotionPending(null);
-        setWhiteTime(600);
-        setBlackTime(600);
+        setPromotionPending(null);
+        setWhiteTime(initialTime);
+        setBlackTime(initialTime);
         setTimerActive(false);
         setCapturedPieces({ white: [], black: [] });
         setMaterialAdvantage(0);
@@ -715,7 +726,8 @@ export const useChessGame = () => {
             playerColor,
             volume,
             isMuted,
-            gameMode
+            gameMode,
+            initialTime
         };
 
         // Add metadata
@@ -734,7 +746,7 @@ export const useChessGame = () => {
         setHasSavedGame(hasAnySave);
 
         return true;
-    }, [game, isGameOver, winner, difficulty, history, undoneMoves, evaluation, whiteTime, blackTime, playerColor, volume, isMuted, gameMode]);
+    }, [game, isGameOver, winner, difficulty, history, undoneMoves, evaluation, whiteTime, blackTime, playerColor, volume, isMuted, gameMode, initialTime]);
 
     const loadGame = useCallback((slotIndex: number = 0) => {
         const savedData = localStorage.getItem(`chess_save_slot_${slotIndex}`);
@@ -763,6 +775,7 @@ export const useChessGame = () => {
             setVolume(state.volume);
             setIsMuted(state.isMuted);
             setGameMode(state.gameMode || 'ai');
+            if (state.initialTime) setInitialTime(state.initialTime);
 
             // Restore Pieces Visuals
             syncPiecesWithBoard(loadedGame.board());
@@ -923,6 +936,8 @@ export const useChessGame = () => {
         hasSavedGame,
         annotations,
         navigateToMove,
-        importPGN
+        importPGN,
+        initialTime,
+        setInitialTime
     };
 };
