@@ -1,6 +1,6 @@
 # 3D Chess Game 🎮♟️
 
-An immersive 3D chess experience built with React, Three.js, and TypeScript, featuring stunning glassmorphic pieces, smooth animations, and an elegant UI.
+An immersive 3D chess experience built with React, Three.js, and TypeScript, featuring stunning glassmorphic pieces, AI opponent, game analysis, and an elegant UI.
 
 ![Chess Game](https://img.shields.io/badge/TypeScript-5.6-blue) ![React](https://img.shields.io/badge/React-18.3-61dafb) ![Three.js](https://img.shields.io/badge/Three.js-0.181-black) ![Vite](https://img.shields.io/badge/Vite-5.4-646cff)
 
@@ -8,20 +8,44 @@ An immersive 3D chess experience built with React, Three.js, and TypeScript, fea
 
 ## ✨ Features
 
-- **🎨 Glassmorphic Chess Pieces** – Beautiful glass-like renderings with realistic physics materials
-- **🎬 Smooth Animations** – Elegant piece movements with trailing effects
-- **💡 Move Highlighting** – Visual feedback for valid moves and selected pieces
-- **🎯 Interactive Board** – Click to select and move pieces with intuitive controls
-- **📊 Game State Management** – Full chess logic powered by chess.js
-- **🎭 Modern UI** – Clean glassmorphism-style overlay showing game status
-- **🔄 Reset Functionality** – Restart games with a single click
-- **📱 Responsive Design** – Works beautifully on desktop browsers
+### 🎨 Visual & Interactive
+- **Glassmorphic Chess Pieces** – Beautiful glass-like renderings with realistic physics materials
+- **Smooth Animations** – Elegant piece movements with trailing effects and capture animations
+- **Interactive Drag & Drop** – Intuitive piece movement with visual cursor feedback (grab/grabbing)
+- **Move Highlighting** – Visual feedback for valid moves, check, last move, and hints
+- **Dynamic Camera** – Automatic camera rotation when playing as Black
+
+### 🤖 AI & Gameplay
+- **AI Opponent** – Play against Stockfish-powered AI with 3 difficulty levels (Easy, Medium, Hard)
+- **Local Multiplayer** – Hotseat mode for two players on the same device
+- **Play as White or Black** – Choose your side with automatic perspective switching
+- **Smart Hints** – Get move suggestions powered by the AI engine
+- **Threat Visualization** – Toggle display of attacked squares
+
+### ⏱️ Game Management
+- **Configurable Time Controls** – Choose from Bullet (1 min) to Classical (60 min)
+- **Multiple Save Slots** – Save and load up to 5 games with metadata preview
+- **Undo/Redo** – Navigate through move history freely
+- **PGN Import/Export** – Share and analyze games in standard chess notation
+- **Move Navigation** – Jump to any point in the game history
+
+### 📊 Analysis & Stats
+- **Enhanced Game Analysis** – Post-game analysis with move classification (brilliant, good, inaccuracy, mistake, blunder)
+- **Evaluation Graph** – Visual representation of position evaluation over time
+- **Critical Moments** – Automatically highlighted turning points in the game
+- **Accuracy Percentage** – Player performance metrics based on centipawn loss
+- **Captured Pieces Display** – Track material with piece icons and advantage score
+- **Position Evaluation** – Real-time evaluation bar showing game state
+
+### 🎮 Modern UI
+- **Glassmorphism Design** – Clean, modern UI with transparency effects
+- **Scrollable Control Panel** – Fixed-height panel with all game controls
+- **Responsive Layout** – Optimized for desktop browsers
+- **Sound Effects** – Audio feedback for moves, captures, and checkmate
 
 ---
 
-## 🚀 Quick Start (For Users)
-
-Want to play the game? Follow these simple steps:
+## 🚀 Quick Start
 
 ### Prerequisites
 - **Node.js** (v18 or later) – [Download here](https://nodejs.org/)
@@ -50,17 +74,26 @@ Want to play the game? Follow these simple steps:
    - Start playing! 🎉
 
 ### How to Play
+
+#### Basic Controls
 - **Left Click** to select a piece and see available moves
-- **Left Click** again on a highlighted square to move
+- **Drag & Drop** pieces to move them (cursor changes to hand)
 - **Right Click/Drag** to rotate the camera view
-- Watch the game status in the glassmorphic overlay
-- Click "Play Again" to reset the game
+
+#### Game Modes
+1. **vs AI** – Play against the computer with adjustable difficulty
+2. **vs Friend** – Local hotseat multiplayer on the same device
+
+#### Features
+- **Hints** – Click the hint button (💡) to see the best move
+- **Threats** – Toggle to see which squares are under attack
+- **Time Control** – Select your preferred time limit before starting
+- **Save/Load** – Save your game to one of 5 slots and resume later
+- **Analysis** – Click "Analyze Game" after finishing to see detailed statistics
 
 ---
 
 ## 🛠️ Developer Guide
-
-For developers who want to modify or extend the project:
 
 ### Project Structure
 
@@ -68,20 +101,29 @@ For developers who want to modify or extend the project:
 Chess-3D/
 ├── src/
 │   ├── components/
-│   │   ├── Board.tsx         # Chess board rendering & interaction
-│   │   ├── Piece.tsx         # 3D piece models with glassmorphic materials
-│   │   ├── Scene.tsx         # Three.js scene setup (lighting, camera)
-│   │   └── Game.tsx          # Main game component with UI overlay
+│   │   ├── Board.tsx             # Chess board rendering & interaction
+│   │   ├── Piece.tsx             # 3D piece models with glassmorphic materials
+│   │   ├── Scene.tsx             # Three.js scene setup (lighting, camera)
+│   │   ├── Game.tsx              # Main game component with UI overlay
+│   │   ├── GameAnalysis.tsx      # Post-game analysis modal
+│   │   ├── SaveLoadModal.tsx     # Save/Load game interface
+│   │   └── PGNModal.tsx          # PGN import/export
 │   ├── hooks/
-│   │   └── useChessGame.ts   # Chess logic & state management
-│   ├── App.tsx               # Error boundary & app wrapper
-│   ├── main.tsx              # React entry point
-│   └── index.css             # Global styles
-├── index.html                # HTML template
-├── package.json              # Dependencies & scripts
-├── tsconfig.json             # TypeScript configuration
-├── vite.config.ts            # Vite configuration
-└── README.md                 # This file
+│   │   └── useChessGame.ts       # Chess logic & state management
+│   ├── workers/
+│   │   └── ai.worker.ts          # Stockfish AI integration
+│   ├── assets/
+│   │   └── sounds/               # Game sound effects
+│   ├── App.tsx                   # Error boundary & app wrapper
+│   ├── main.tsx                  # React entry point
+│   └── index.css                 # Global styles
+├── public/
+│   ├── stockfish.js              # Stockfish engine
+│   └── stockfish.wasm.js         # WASM version
+├── package.json                  # Dependencies & scripts
+├── tsconfig.json                 # TypeScript configuration
+├── vite.config.ts                # Vite configuration
+└── README.md                     # This file
 ```
 
 ### Technology Stack
@@ -96,6 +138,7 @@ Chess-3D/
 | **chess.js** | 1.4 | Chess game logic & validation |
 | **Vite** | 5.4 | Fast build tool & dev server |
 | **lucide-react** | 0.555 | Icon library |
+| **Stockfish** | Latest | Chess engine for AI & analysis |
 
 ### Available Scripts
 
@@ -109,40 +152,58 @@ npm run lint     # Run ESLint for code quality
 ### Key Components
 
 #### `useChessGame.ts`
-Custom hook managing chess state:
+Comprehensive chess state management:
 - Game initialization with chess.js
 - Move validation and execution
-- Turn management
-- Win/draw detection
-- Reset functionality
+- AI move calculation via Web Worker
+- Turn and timer management
+- Game modes (AI vs Local multiplayer)
+- Save/load functionality with 5 slots
+- Undo/redo with proper state restoration
+- PGN import/export
+- Hint generation
+- Captured pieces tracking
+- Material advantage calculation
 
 #### `Board.tsx`
-Renders the chess board:
-- 64 interactive squares with click handlers
-- Move highlighting (selected, possible moves)
-- Piece positioning based on FEN notation
-- Board frame and styling
+Interactive chess board:
+- 64 clickable squares with visual effects
+- Move highlighting (selected, valid, check, last move, hints)
+- Drag and drop support
+- Threat visualization
 
 #### `Piece.tsx`
-3D chess piece rendering:
-- Lathe geometry for traditional piece shapes
+Advanced 3D piece rendering:
+- GLTF model loading for realistic pieces
 - Glassmorphic materials (transmission, clearcoat)
-- Smooth move animations with trails
-- Color differentiation (white/black)
+- Smooth move animations with easing
+- Capture animations with physics
+- Drag state with cursor feedback
 
-#### `Scene.tsx`
-Three.js scene configuration:
-- Ambient and directional lighting
-- Camera orbit controls
-- Shadow mapping setup
+#### `GameAnalysis.tsx`
+Post-game analysis:
+- Sequential position evaluation
+- Move classification system
+- Accuracy calculation
+- Evaluation graph visualization
+- Critical moment detection
+- Interactive move navigation
+
+#### `ai.worker.ts`
+Web Worker for AI:
+- Stockfish integration
+- Position analysis
+- Best move calculation
+- Move annotation
+- Difficulty-based depth configuration
 
 ### Development Tips
 
-1. **Adding New Piece Types**: Modify the `points` generation in `Piece.tsx`
-2. **Changing Board Colors**: Update color values in `Board.tsx` squares mapping
-3. **Adjusting Animations**: Tweak `progress` and `delta` multipliers in `Piece.tsx`
-4. **UI Customization**: Edit glassmorphism styles in `Game.tsx` overlay
-5. **Game Rules**: Extend `useChessGame.ts` for custom chess variants
+1. **AI Behavior**: Adjust difficulty in `ai.worker.ts` by modifying depth values
+2. **UI Customization**: Edit glassmorphism styles in `Game.tsx`
+3. **Piece Models**: Swap GLTF model URL in `Piece.tsx` for different styles
+4. **Time Controls**: Add new presets in `Game.tsx` time control selector
+5. **Analysis Depth**: Modify analysis depth in `GameAnalysis.tsx` for speed/accuracy trade-off
 
 ### Building for Production
 
@@ -150,17 +211,56 @@ Three.js scene configuration:
 npm run build
 ```
 
-This creates an optimized build in the `dist/` folder, ready for deployment to any static hosting service (Vercel, Netlify, GitHub Pages, etc.).
+Creates an optimized build in `dist/` folder, ready for deployment to static hosting (Vercel, Netlify, GitHub Pages).
+
+### Building Desktop App (Optional)
+
+```bash
+npm run tauri build
+```
+
+Creates a portable executable for Windows/macOS/Linux using Tauri.
 
 ---
 
-## 🎮 Controls
+## 🎮 Complete Controls Guide
 
 | Action | Control |
 |--------|---------|
-| Select/Move Piece | Left Click |
+| Select Piece | Left Click |
+| Move Piece | Drag & Drop or Click destination |
 | Rotate Camera | Right Click + Drag |
-| Reset Game | Click "Play Again" button |
+| Reset Game | "Reset Game" button |
+| Undo Move | Undo button (↶) |
+| Redo Move | Redo button (↷) |
+| Get Hint | Hint button (💡) |
+| Toggle Threats | "Show Threats" button |
+| Save Game | Save button → Select slot |
+| Load Game | Load button → Select slot |
+| Analyze Game | "Analyze Game" button (after game ends) |
+
+---
+
+## 🧩 Features Breakdown
+
+### Game Modes
+- **AI Mode**: Play against Stockfish with Easy, Medium, or Hard difficulty
+- **Local Mode**: Two players on the same device (hotseat)
+
+### Time Controls
+- 1 minute (Bullet)
+- 3 minutes (Blitz)
+- 5 minutes (Blitz)
+- 10 minutes (Rapid) - Default
+- 30 minutes (Classical)
+- 60 minutes
+
+### Analysis Features
+- Move-by-move evaluation
+- Brilliant moves (‼), Good (!), Inaccuracies (?!), Mistakes (?), Blunders (??)
+- Accuracy percentage for both sides
+- Evaluation graph with critical moments marked
+- Best move suggestions for mistakes
 
 ---
 
@@ -186,10 +286,28 @@ This project is licensed under the MIT License – see the [LICENSE](LICENSE) fi
 
 ## 🙏 Acknowledgments
 
+- **Stockfish** for the powerful chess engine
 - **chess.js** for robust chess logic
 - **Three.js** community for 3D rendering excellence
 - **React Three Fiber** for seamless React integration
 
 ---
 
+## 🐛 Known Issues & Roadmap
+
+### Upcoming Features
+- Opening book integration
+- Online multiplayer
+- Chess960 support
+- Puzzle mode
+- Tournament mode
+
+### Performance
+- Analysis can take 10-30 seconds for longer games
+- Large game histories may impact performance
+
+---
+
 **Enjoy playing! ♟️✨**
+
+Made with 💖 by [Nayeem](https://www.facebook.com/LegendCoder)
