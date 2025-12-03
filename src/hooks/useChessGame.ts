@@ -624,8 +624,12 @@ export const useChessGame = () => {
     }, [game, undoneMoves, playerColor]);
 
     const makeAIMove = useCallback(() => {
-        if (game.turn() === playerColor || isGameOver || !worker || gameMode === 'local') return;
+        if (game.turn() === playerColor || isGameOver || !worker || gameMode === 'local') {
+            console.log('[makeAIMove] Skipped. Turn:', game.turn(), 'Player:', playerColor, 'GameOver:', isGameOver, 'Worker:', !!worker, 'Mode:', gameMode);
+            return;
+        }
 
+        console.log('[makeAIMove] Posting message to worker...');
         // Post message to worker
         worker.postMessage({
             fen: game.fen(),
@@ -633,7 +637,7 @@ export const useChessGame = () => {
             difficulty,
             type: 'move'
         });
-    }, [game, playerColor, isGameOver, worker, difficulty]);
+    }, [game, playerColor, isGameOver, worker, difficulty, gameMode]);
 
     // AI Move Effect - White always moves first (standard chess)
     useEffect(() => {
@@ -641,7 +645,13 @@ export const useChessGame = () => {
         const canAIMove = game.history().length > 0 || (playerColor === 'b' && game.history().length === 0);
 
         if (isAITurn && canAIMove) {
-            const timer = setTimeout(makeAIMove, 500);
+            console.log('[AI Effect] Triggering AI move. Turn:', game.turn(), 'Player:', playerColor);
+            // Move immediately for the first move to avoid delay perception, else wait for realism
+            const delay = game.history().length === 0 ? 100 : 500;
+            const timer = setTimeout(() => {
+                console.log('[AI Effect] Executing makeAIMove...');
+                makeAIMove();
+            }, delay);
             return () => clearTimeout(timer);
         }
     }, [game, isGameOver, playerColor, makeAIMove, gameMode]);
