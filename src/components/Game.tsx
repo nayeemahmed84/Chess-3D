@@ -6,7 +6,8 @@ import { GameAnalysis } from './GameAnalysis';
 import { SaveLoadModal } from './SaveLoadModal';
 import { PGNModal } from './PGNModal';
 import { CapturedPieces } from './CapturedPieces';
-import { RotateCcw, RotateCw, Trophy, ChevronLeft, ChevronRight, Volume2, VolumeX, Maximize, Minimize, Save, Upload, Check, AlertTriangle, X, Download } from 'lucide-react';
+import { MultiplayerMenu } from './MultiplayerMenu';
+import { RotateCcw, RotateCw, Trophy, ChevronLeft, ChevronRight, Volume2, VolumeX, Maximize, Minimize, Save, Upload, Check, AlertTriangle, X, Download, Users } from 'lucide-react';
 
 import { open } from '@tauri-apps/plugin-shell';
 
@@ -53,6 +54,7 @@ const Game = () => {
     const [showAnalysis, setShowAnalysis] = useState(false);
     const [saveLoadMode, setSaveLoadMode] = useState<'save' | 'load' | null>(null);
     const [pgnMode, setPGNMode] = useState<'export' | 'import' | null>(null);
+    const [showMultiplayerMenu, setShowMultiplayerMenu] = useState(false);
     const [notification, setNotification] = useState<{ type: 'success' | 'confirm' | 'error', message: string, onConfirm?: () => void } | null>(null);
 
     const toggleFullscreen = () => {
@@ -449,6 +451,26 @@ const Game = () => {
                             }}
                         >
                             vs Friend
+                        </button>
+                        <button
+                            onClick={() => setShowMultiplayerMenu(true)}
+                            style={{
+                                flex: 1,
+                                padding: '8px',
+                                background: gameMode === 'online' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)',
+                                color: 'white',
+                                border: '1px solid rgba(255, 255, 255, 0.2)',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                fontSize: '14px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '4px'
+                            }}
+                        >
+                            <Users size={14} />
+                            Online
                         </button>
                     </div>
                 </div>
@@ -1184,6 +1206,23 @@ const Game = () => {
                     />
                 )
             }
+            {/* Multiplayer Menu */}
+            {showMultiplayerMenu && (
+                <MultiplayerMenu
+                    onClose={() => setShowMultiplayerMenu(false)}
+                    onGameStart={(isHost) => {
+                        setShowMultiplayerMenu(false);
+                        setGameMode('online');
+                        setPlayerColor(isHost ? 'w' : 'b');
+                        resetGame();
+                        setNotification({
+                            type: 'success',
+                            message: isHost ? 'Game Started! You are White.' : 'Connected! You are Black.'
+                        });
+                        setTimeout(() => setNotification(null), 3000);
+                    }}
+                />
+            )}
         </div >
     );
 };

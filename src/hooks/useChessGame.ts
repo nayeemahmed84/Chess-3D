@@ -14,7 +14,9 @@ export interface PieceState {
 }
 
 export type Difficulty = 'Easy' | 'Medium' | 'Hard';
-export type GameMode = 'ai' | 'local';
+export type GameMode = 'ai' | 'local' | 'online';
+
+import { multiplayerService } from '../services/MultiplayerService';
 
 interface SavedGame {
     fen: string;
@@ -353,6 +355,10 @@ export const useChessGame = (gameModeProp: 'local' | 'ai' = 'ai') => {
 
                 handleMoveSound(move, gameCopy);
 
+                if (!isAI && gameMode === 'online') {
+                    handleMultiplayerMove(from, to, promotion);
+                }
+
                 if (gameCopy.isGameOver()) {
                     setIsGameOver(true);
                     setTimerActive(false);
@@ -369,7 +375,30 @@ export const useChessGame = (gameModeProp: 'local' | 'ai' = 'ai') => {
             return false;
         }
         return false;
-    }, [game, worker]);
+    }, [game, worker, gameMode]);
+
+    // Multiplayer Move Listener
+    useEffect(() => {
+        multiplayerService.onData((data) => {
+            if (data.type === 'move') {
+                const { from, to, promotion } = data.payload;
+                console.log('[Multiplayer] Received move:', from, to);
+                // Make the move on our board, set isAI=true to bypass some checks if needed, 
+                // but mostly to indicate it's not a local user interaction that needs sending back
+                makeMove(from, to, promotion, true);
+            }
+        });
+    }, [makeMove]);
+
+    // Send move if online
+    const handleMultiplayerMove = (from: Square, to: Square, promotion?: string) => {
+        if (gameMode === 'online') {
+            multiplayerService.sendData({
+                type: 'move',
+                payload: { from, to, promotion }
+            });
+        }
+    };
 
     const handleWorkerMessage = useCallback((e: MessageEvent) => {
         const { type, move, data } = e.data;
