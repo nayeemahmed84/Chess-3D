@@ -84,6 +84,8 @@ export const useChessGame = (gameModeProp: 'local' | 'ai' = 'ai') => {
     const [showThreats, setShowThreats] = useState(false);
     const [attackedSquares, setAttackedSquares] = useState<Square[]>([]);
     const [hasSavedGame, setHasSavedGame] = useState(false);
+    const [opponentSelection, setOpponentSelection] = useState<Square | null>(null);
+    const [isOpponentConnected, setIsOpponentConnected] = useState(false);
 
     const [capturedPieces, setCapturedPieces] = useState<{ white: string[], black: string[] }>({ white: [], black: [] });
     const [materialAdvantage, setMaterialAdvantage] = useState(0);
@@ -386,8 +388,28 @@ export const useChessGame = (gameModeProp: 'local' | 'ai' = 'ai') => {
                 // Make the move on our board, set isAI=true to bypass some checks if needed, 
                 // but mostly to indicate it's not a local user interaction that needs sending back
                 makeMove(from, to, promotion, true);
+            } else if (data.type === 'interaction') {
+                const { type, square } = data.payload;
+                if (type === 'select') {
+                    setOpponentSelection(square);
+                } else if (type === 'deselect') {
+                    setOpponentSelection(null);
+                }
             }
         });
+
+        multiplayerService.onConnect(() => {
+            console.log('[useChessGame] Opponent connected');
+            setIsOpponentConnected(true);
+        });
+
+        multiplayerService.onDisconnect(() => {
+            console.log('[useChessGame] Opponent disconnected');
+            setIsOpponentConnected(false);
+        });
+
+        // Initialize connection state
+        setIsOpponentConnected(multiplayerService.isConnected());
     }, [makeMove]);
 
     // Send move if online
@@ -397,8 +419,30 @@ export const useChessGame = (gameModeProp: 'local' | 'ai' = 'ai') => {
                 type: 'move',
                 payload: { from, to, promotion }
             });
+            // Also clear selection on move
+            multiplayerService.sendData({
+                type: 'interaction',
+                payload: { type: 'deselect' }
+            });
         }
     };
+
+    const handleSquareSelect = (square: Square | null) => {
+        if (gameMode === 'online') {
+            if (square) {
+                multiplayerService.sendData({
+                    type: 'interaction',
+                    payload: { type: 'select', square }
+                });
+            } else {
+                multiplayerService.sendData({
+                    type: 'interaction',
+                    payload: { type: 'deselect' }
+                });
+            }
+        }
+    };
+
 
     const handleWorkerMessage = useCallback((e: MessageEvent) => {
         const { type, move, data } = e.data;
@@ -988,6 +1032,9 @@ export const useChessGame = (gameModeProp: 'local' | 'ai' = 'ai') => {
         importPGN,
         initialTime,
         setInitialTime,
-        opening
+        opening,
+        opponentSelection,
+        isOpponentConnected,
+        handleSquareSelect
     };
 };

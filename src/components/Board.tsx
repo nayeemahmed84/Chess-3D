@@ -13,10 +13,11 @@ interface BoardProps {
     pieces: PieceState[];
     hintMove: { from: Square; to: Square } | null;
     attackedSquares: Square[];
+    opponentSelection: Square | null;
     onInteractionChange: (isInteracting: boolean) => void;
 }
 
-export const Board = ({ onMove, turn, getPossibleMoves, pieces, lastMove, checkSquare, hintMove, attackedSquares, onInteractionChange }: BoardProps) => {
+export const Board = ({ onMove, turn, getPossibleMoves, pieces, lastMove, checkSquare, hintMove, attackedSquares, opponentSelection, onInteractionChange }: BoardProps) => {
     const [selectedSquare, setSelectedSquare] = useState<Square | null>(null);
     const [possibleMoves, setPossibleMoves] = useState<string[]>([]);
     const [draggedPiece, setDraggedPiece] = useState<{ id: string, type: string, color: string, startSquare: Square } | null>(null);
@@ -121,6 +122,7 @@ export const Board = ({ onMove, turn, getPossibleMoves, pieces, lastMove, checkS
                 const isPossibleMove = possibleMoves.includes(sq.name);
                 const isLastMove = lastMove && (lastMove.from === sq.name || lastMove.to === sq.name);
                 const isCheck = checkSquare === sq.name;
+                const isOpponentSelected = opponentSelection === sq.name;
 
                 let color = sq.color;
                 let emissive = '#000000';
@@ -173,6 +175,18 @@ export const Board = ({ onMove, turn, getPossibleMoves, pieces, lastMove, checkS
                     color = sq.isBlack ? '#4d1a1a' : '#883333';
                     emissive = '#ff0000';
                     emissiveIntensity = 0.2;
+                } else if (attackedSquares.includes(sq.name)) {
+                    // Attacked square - Red tint
+                    color = sq.isBlack ? '#4d1a1a' : '#883333';
+                    emissive = '#ff0000';
+                    emissiveIntensity = 0.2;
+                } else if (isOpponentSelected) {
+                    // Opponent selection - Yellow/Orange
+                    color = '#ffaa00';
+                    emissive = '#ffaa00';
+                    emissiveIntensity = 0.5;
+                    height = 0.11;
+                    radius = 0.02;
                 }
 
                 return (

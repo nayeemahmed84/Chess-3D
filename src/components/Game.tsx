@@ -46,7 +46,7 @@ const Game = () => {
         volume, setVolume, isMuted, toggleMute,
         saveGame, loadGame, deleteSave, hasSavedGame, game, navigateToMove, importPGN,
         gameMode, setGameMode, capturedPieces, materialAdvantage, initialTime, setInitialTime,
-        opening
+        opening, opponentSelection, isOpponentConnected
     } = useChessGame();
 
     const [isPanelVisible, setIsPanelVisible] = useState(true);
@@ -56,6 +56,7 @@ const Game = () => {
     const [pgnMode, setPGNMode] = useState<'export' | 'import' | null>(null);
     const [showMultiplayerMenu, setShowMultiplayerMenu] = useState(false);
     const [notification, setNotification] = useState<{ type: 'success' | 'confirm' | 'error', message: string, onConfirm?: () => void } | null>(null);
+    const [connectionStatusMessage, setConnectionStatusMessage] = useState<'connected' | 'disconnected' | null>(null);
 
     const toggleFullscreen = () => {
         if (!document.fullscreenElement) {
@@ -77,15 +78,15 @@ const Game = () => {
 
     // Auto-hide panel after first move
     useEffect(() => {
-        // Check for length <= 2 to catch case where AI moves immediately (length jumps 0 -> 2)
-        if (history.length > 0 && history.length <= 2 && isPanelVisible) {
-            // Small delay to let user see the move, then hide panel
+        // Only auto-hide once when history reaches 1-2 moves
+        // Don't include isPanelVisible in dependencies to avoid re-hiding when user manually shows it
+        if (history.length > 0 && history.length <= 2) {
             const timer = setTimeout(() => {
                 setIsPanelVisible(false);
             }, 1000);
             return () => clearTimeout(timer);
         }
-    }, [history.length, isPanelVisible]);
+    }, [history.length]);
 
     // Keyboard shortcuts
     useEffect(() => {
@@ -179,6 +180,27 @@ const Game = () => {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [undoMove, redoMove, requestHint, resetGame, saveGame, loadGame, hasSavedGame, showThreats, setShowThreats, promotionPending, notification, toggleFullscreen, isPanelVisible]);
 
+    // Connection status message auto-hide
+    useEffect(() => {
+        if (connectionStatusMessage) {
+            const timer = setTimeout(() => {
+                setConnectionStatusMessage(null);
+            }, 3000); // Show for 3 seconds then hide
+            return () => clearTimeout(timer);
+        }
+    }, [connectionStatusMessage]);
+
+    // Watch for connection status changes
+    useEffect(() => {
+        if (gameMode === 'online') {
+            if (isOpponentConnected) {
+                setConnectionStatusMessage('connected');
+            } else {
+                setConnectionStatusMessage('disconnected');
+            }
+        }
+    }, [isOpponentConnected, gameMode]);
+
 
 
     return (
@@ -196,6 +218,7 @@ const Game = () => {
                         playerColor={playerColor}
                         hintMove={hintMove}
                         attackedSquares={attackedSquares}
+                        opponentSelection={opponentSelection}
                     />
                 </React.Suspense>
             </Canvas>
@@ -402,6 +425,35 @@ const Game = () => {
                         </div>
                     </div>
                 </div>
+
+                {/* Connection Status - Permanent indicator in left panel */}
+                {gameMode === 'online' && (
+                    <div style={{
+                        marginBottom: '12px',
+                        padding: '8px 12px',
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px'
+                    }}>
+                        <div style={{
+                            width: '8px',
+                            height: '8px',
+                            borderRadius: '50%',
+                            background: isOpponentConnected ? '#4ade80' : '#ef4444',
+                            boxShadow: isOpponentConnected ? '0 0 8px #4ade80' : 'none',
+                            transition: 'all 0.3s ease'
+                        }} />
+                        <div style={{
+                            fontSize: '12px',
+                            opacity: 0.8
+                        }}>
+                            {isOpponentConnected ? 'Connected' : 'Waiting...'}
+                        </div>
+                    </div>
+                )}
 
                 {/* Opening Display */}
                 {opening && (
@@ -1222,6 +1274,47 @@ const Game = () => {
                         setTimeout(() => setNotification(null), 3000);
                     }}
                 />
+            )}
+
+            {/* Temporary Connection Status Popup - Right side, shows for 3 seconds */}
+            {gameMode === 'online' && connectionStatusMessage && (
+                <div style={{
+                    position: 'fixed',
+                    top: '20px',
+                    right: '20px',
+                    background: connectionStatusMessage === 'connected'
+                        ? 'linear-gradient(135deg, rgba(76, 175, 80, 0.25), rgba(76, 175, 80, 0.15))'
+                        : 'linear-gradient(135deg, rgba(239, 68, 68, 0.25), rgba(239, 68, 68, 0.15))',
+                    backdropFilter: 'blur(10px)',
+                    padding: '12px 18px',
+                    borderRadius: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    color: 'white',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    border: `2px solid ${connectionStatusMessage === 'connected' ? 'rgba(76, 175, 80, 0.5)' : 'rgba(239, 68, 68, 0.5)'}`,
+                    boxShadow: connectionStatusMessage === 'connected'
+                        ? '0 4px 20px rgba(76, 175, 80, 0.3)'
+                        : '0 4px 20px rgba(239, 68, 68, 0.3)',
+                    zIndex: 3000
+                }}>
+                    <div style={{
+                        width: '10px',
+                        height: '10px',
+                        borderRadius: '50%',
+                        background: connectionStatusMessage === 'connected' ? '#4ade80' : '#ef4444',
+                        boxShadow: connectionStatusMessage === 'connected'
+                            ? '0 0 12px #4ade80'
+                            : '0 0 12px #ef4444'
+                    }} />
+                    <span style={{
+                        color: connectionStatusMessage === 'connected' ? '#4ade80' : '#ef4444'
+                    }}>
+                        {connectionStatusMessage === 'connected' ? 'Opponent Connected' : 'Opponent Disconnected'}
+                    </span>
+                </div>
             )}
         </div >
     );

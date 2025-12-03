@@ -1,7 +1,7 @@
 import Peer, { DataConnection } from 'peerjs';
 
 export interface MultiplayerData {
-    type: 'move' | 'game_start' | 'game_over' | 'chat';
+    type: 'move' | 'game_start' | 'game_over' | 'chat' | 'interaction' | 'heartbeat';
     payload: any;
 }
 
@@ -11,6 +11,9 @@ class MultiplayerService {
     private onDataCallback: ((data: MultiplayerData) => void) | null = null;
     private onConnectCallback: (() => void) | null = null;
     private onDisconnectCallback: (() => void) | null = null;
+    private heartbeatInterval: number | null = null;
+    private heartbeatTimeoutId: number | null = null;
+    private lastHeartbeatReceived: number = 0;
 
     public myId: string = '';
 
@@ -48,24 +51,86 @@ class MultiplayerService {
         this.conn.on('open', () => {
             console.log('Connection established!');
             if (this.onConnectCallback) this.onConnectCallback();
+            this.startHeartbeat();
         });
 
         this.conn.on('data', (data) => {
+            const typedData = data as MultiplayerData;
+
+            // Handle heartbeat separately
+            if (typedData.type === 'heartbeat') {
+                this.lastHeartbeatReceived = Date.now();
+                console.log('[Heartbeat] Received from peer');
+                return;
+            }
+
             console.log('Received data:', data);
             if (this.onDataCallback) {
-                this.onDataCallback(data as MultiplayerData);
+                this.onDataCallback(typedData);
             }
         });
 
         this.conn.on('close', () => {
             console.log('Connection closed');
             this.conn = null;
+            this.stopHeartbeat();
             if (this.onDisconnectCallback) this.onDisconnectCallback();
         });
 
         this.conn.on('error', (err) => {
             console.error('Connection error:', err);
+            this.triggerDisconnect();
         });
+    }
+
+    private startHeartbeat() {
+        this.stopHeartbeat();
+        this.lastHeartbeatReceived = Date.now();
+
+        // Send heartbeat every 3 seconds
+        this.heartbeatInterval = window.setInterval(() => {
+            if (this.conn && this.conn.open) {
+                this.conn.send({ type: 'heartbeat', payload: null });
+                console.log('[Heartbeat] Sent to peer');
+            }
+        }, 3000);
+
+        // Check for missing heartbeats every 8 seconds
+        // If no heartbeat received in last 10 seconds, disconnect
+        this.heartbeatTimeoutId = window.setInterval(() => {
+            const timeSinceLastHeartbeat = Date.now() - this.lastHeartbeatReceived;
+            console.log(`[Heartbeat] Time since last: ${timeSinceLastHeartbeat}ms`);
+
+            if (timeSinceLastHeartbeat > 10000) {
+                console.log('[Heartbeat] Timeout - no heartbeat received, triggering disconnect');
+                this.triggerDisconnect();
+            }
+        }, 8000);
+    }
+
+    private stopHeartbeat() {
+        if (this.heartbeatInterval) {
+            clearInterval(this.heartbeatInterval);
+            this.heartbeatInterval = null;
+        }
+        if (this.heartbeatTimeoutId) {
+            clearInterval(this.heartbeatTimeoutId);
+            this.heartbeatTimeoutId = null;
+        }
+    }
+
+    private triggerDisconnect() {
+        console.log('[MultiplayerService] Triggering disconnect');
+        this.stopHeartbeat();
+
+        if (this.conn) {
+            this.conn.close();
+            this.conn = null;
+        }
+
+        if (this.onDisconnectCallback) {
+            this.onDisconnectCallback();
+        }
     }
 
     sendData(data: MultiplayerData) {
@@ -82,13 +147,22 @@ class MultiplayerService {
 
     onConnect(callback: () => void) {
         this.onConnectCallback = callback;
+        // If already connected, fire the callback immediately
+        if (this.conn && this.conn.open) {
+            callback();
+        }
     }
 
     onDisconnect(callback: () => void) {
         this.onDisconnectCallback = callback;
     }
 
+    isConnected(): boolean {
+        return this.conn !== null && this.conn.open;
+    }
+
     disconnect() {
+        this.stopHeartbeat();
         if (this.conn) {
             this.conn.close();
         }
