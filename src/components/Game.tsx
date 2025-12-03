@@ -5,6 +5,7 @@ import { useChessGame } from '../hooks/useChessGame';
 import { GameAnalysis } from './GameAnalysis';
 import { SaveLoadModal } from './SaveLoadModal';
 import { PGNModal } from './PGNModal';
+import { CapturedPieces } from './CapturedPieces';
 import { RotateCcw, RotateCw, Trophy, ChevronLeft, ChevronRight, Volume2, VolumeX, Maximize, Minimize, Save, Upload, Check, AlertTriangle, X, Download } from 'lucide-react';
 
 import { open } from '@tauri-apps/plugin-shell';
@@ -43,7 +44,7 @@ const Game = () => {
         hintMove, showHint, showThreats, setShowThreats, attackedSquares, requestHint,
         volume, setVolume, isMuted, toggleMute,
         saveGame, loadGame, deleteSave, hasSavedGame, game, navigateToMove, importPGN,
-        gameMode, setGameMode
+        gameMode, setGameMode, capturedPieces, materialAdvantage
     } = useChessGame();
 
     const [isPanelVisible, setIsPanelVisible] = useState(true);
@@ -352,6 +353,9 @@ const Game = () => {
                     }}>
                         <div style={{ fontSize: '10px', opacity: 0.7 }}>White</div>
                         <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{formatTime(whiteTime)}</div>
+                        <div style={{ marginTop: '4px' }}>
+                            <CapturedPieces pieces={capturedPieces.white} score={materialAdvantage > 0 ? materialAdvantage : undefined} />
+                        </div>
                     </div>
                     <div style={{
                         background: turn === 'b' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)',
@@ -360,6 +364,9 @@ const Game = () => {
                     }}>
                         <div style={{ fontSize: '10px', opacity: 0.7 }}>Black</div>
                         <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{formatTime(blackTime)}</div>
+                        <div style={{ marginTop: '4px' }}>
+                            <CapturedPieces pieces={capturedPieces.black} score={materialAdvantage < 0 ? -materialAdvantage : undefined} />
+                        </div>
                     </div>
                 </div>
 

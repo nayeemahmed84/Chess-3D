@@ -81,6 +81,8 @@ export const useChessGame = () => {
     const [attackedSquares, setAttackedSquares] = useState<Square[]>([]);
     const [hasSavedGame, setHasSavedGame] = useState(false);
     const [annotations, setAnnotations] = useState<Record<number, string>>({});
+    const [capturedPieces, setCapturedPieces] = useState<{ white: string[], black: string[] }>({ white: [], black: [] });
+    const [materialAdvantage, setMaterialAdvantage] = useState(0);
 
     // Volume state
     const [volume, setVolume] = useState(1);
@@ -303,6 +305,29 @@ export const useChessGame = () => {
                 setHistory(gameCopy.history());
                 setUndoneMoves([]); // Clear redo stack on new move
                 setEvaluation(evaluateBoard(gameCopy));
+
+                // Calculate captured pieces
+                const history = gameCopy.history({ verbose: true });
+                const capturedW: string[] = [];
+                const capturedB: string[] = [];
+                let scoreW = 0;
+                let scoreB = 0;
+
+                history.forEach(move => {
+                    if (move.captured) {
+                        if (move.color === 'w') {
+                            capturedW.push(move.captured);
+                            scoreW += PIECE_VALUES[move.captured];
+                        } else {
+                            capturedB.push(move.captured);
+                            scoreB += PIECE_VALUES[move.captured];
+                        }
+                    }
+                });
+
+                setCapturedPieces({ white: capturedW, black: capturedB });
+                setMaterialAdvantage(scoreW - scoreB);
+
                 setTimerActive(true); // Start timer on first move
 
                 // Update visual hints
@@ -504,6 +529,27 @@ export const useChessGame = () => {
             setEvaluation(evaluateBoard(gameCopy));
             syncPiecesWithBoard(gameCopy.board());
 
+            // Recalculate captured pieces on undo
+            const history = gameCopy.history({ verbose: true });
+            const capturedW: string[] = [];
+            const capturedB: string[] = [];
+            let scoreW = 0;
+            let scoreB = 0;
+
+            history.forEach(move => {
+                if (move.captured) {
+                    if (move.color === 'w') {
+                        capturedW.push(move.captured);
+                        scoreW += PIECE_VALUES[move.captured];
+                    } else {
+                        capturedB.push(move.captured);
+                        scoreB += PIECE_VALUES[move.captured];
+                    }
+                }
+            });
+            setCapturedPieces({ white: capturedW, black: capturedB });
+            setMaterialAdvantage(scoreW - scoreB);
+
             // Update visual hints
             const hist = gameCopy.history({ verbose: true });
             if (hist.length > 0) {
@@ -553,6 +599,27 @@ export const useChessGame = () => {
             setEvaluation(evaluateBoard(gameCopy));
             syncPiecesWithBoard(gameCopy.board());
             handleMoveSound(move, gameCopy);
+
+            // Recalculate captured pieces on redo
+            const history = gameCopy.history({ verbose: true });
+            const capturedW: string[] = [];
+            const capturedB: string[] = [];
+            let scoreW = 0;
+            let scoreB = 0;
+
+            history.forEach(move => {
+                if (move.captured) {
+                    if (move.color === 'w') {
+                        capturedW.push(move.captured);
+                        scoreW += PIECE_VALUES[move.captured];
+                    } else {
+                        capturedB.push(move.captured);
+                        scoreB += PIECE_VALUES[move.captured];
+                    }
+                }
+            });
+            setCapturedPieces({ white: capturedW, black: capturedB });
+            setMaterialAdvantage(scoreW - scoreB);
         }
     }, [game, undoneMoves, playerColor]);
 
@@ -596,6 +663,8 @@ export const useChessGame = () => {
         setWhiteTime(600);
         setBlackTime(600);
         setTimerActive(false);
+        setCapturedPieces({ white: [], black: [] });
+        setMaterialAdvantage(0);
 
         const initialPieces: PieceState[] = [];
         const board = newGame.board();
@@ -749,6 +818,27 @@ export const useChessGame = () => {
             setUndoneMoves([]);
             setEvaluation(evaluateBoard(newGame));
 
+            // Recalculate captured pieces on import
+            const history = newGame.history({ verbose: true });
+            const capturedW: string[] = [];
+            const capturedB: string[] = [];
+            let scoreW = 0;
+            let scoreB = 0;
+
+            history.forEach(move => {
+                if (move.captured) {
+                    if (move.color === 'w') {
+                        capturedW.push(move.captured);
+                        scoreW += PIECE_VALUES[move.captured];
+                    } else {
+                        capturedB.push(move.captured);
+                        scoreB += PIECE_VALUES[move.captured];
+                    }
+                }
+            });
+            setCapturedPieces({ white: capturedW, black: capturedB });
+            setMaterialAdvantage(scoreW - scoreB);
+
             // Reset game state
             setIsGameOver(newGame.isGameOver());
             if (newGame.isGameOver()) {
@@ -811,6 +901,8 @@ export const useChessGame = () => {
         setShowThreats,
         attackedSquares,
         requestHint,
+        capturedPieces,
+        materialAdvantage,
         volume,
         setVolume,
         isMuted,
