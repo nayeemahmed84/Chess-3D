@@ -42,7 +42,8 @@ const Game = () => {
         promotionPending, onPromotionSelect, lastMove, checkSquare, playerColor, setPlayerColor,
         hintMove, showHint, showThreats, setShowThreats, attackedSquares, requestHint,
         volume, setVolume, isMuted, toggleMute,
-        saveGame, loadGame, deleteSave, hasSavedGame, game, navigateToMove, importPGN
+        saveGame, loadGame, deleteSave, hasSavedGame, game, navigateToMove, importPGN,
+        gameMode, setGameMode
     } = useChessGame();
 
     const [isPanelVisible, setIsPanelVisible] = useState(true);
@@ -363,27 +364,65 @@ const Game = () => {
                 </div>
 
                 <div style={{ marginBottom: '16px' }}>
-                    <label style={{ display: 'block', fontSize: '12px', color: 'rgba(255,255,255,0.6)', marginBottom: '4px' }}>Difficulty</label>
-                    <select
-                        value={difficulty}
-                        onChange={(e) => setDifficulty(e.target.value as any)}
-                        style={{
-                            width: '100%',
-                            padding: '8px',
-                            background: 'rgba(0, 0, 0, 0.3)',
-                            color: 'white',
-                            border: '1px solid rgba(255, 255, 255, 0.2)',
-                            borderRadius: '8px',
-                            outline: 'none',
-                            cursor: 'pointer',
-                            fontSize: '14px'
-                        }}
-                    >
-                        <option value="Easy">Easy</option>
-                        <option value="Medium">Medium</option>
-                        <option value="Hard">Hard</option>
-                    </select>
+                    <label style={{ display: 'block', fontSize: '12px', color: 'rgba(255,255,255,0.6)', marginBottom: '4px' }}>Game Mode</label>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                            onClick={() => setGameMode('ai')}
+                            style={{
+                                flex: 1,
+                                padding: '8px',
+                                background: gameMode === 'ai' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)',
+                                color: 'white',
+                                border: '1px solid rgba(255, 255, 255, 0.2)',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                fontSize: '14px'
+                            }}
+                        >
+                            vs AI
+                        </button>
+                        <button
+                            onClick={() => setGameMode('local')}
+                            style={{
+                                flex: 1,
+                                padding: '8px',
+                                background: gameMode === 'local' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)',
+                                color: 'white',
+                                border: '1px solid rgba(255, 255, 255, 0.2)',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                fontSize: '14px'
+                            }}
+                        >
+                            vs Friend
+                        </button>
+                    </div>
                 </div>
+
+                {gameMode === 'ai' && (
+                    <div style={{ marginBottom: '16px' }}>
+                        <label style={{ display: 'block', fontSize: '12px', color: 'rgba(255,255,255,0.6)', marginBottom: '4px' }}>Difficulty</label>
+                        <select
+                            value={difficulty}
+                            onChange={(e) => setDifficulty(e.target.value as any)}
+                            style={{
+                                width: '100%',
+                                padding: '8px',
+                                background: 'rgba(0, 0, 0, 0.3)',
+                                color: 'white',
+                                border: '1px solid rgba(255, 255, 255, 0.2)',
+                                borderRadius: '8px',
+                                outline: 'none',
+                                cursor: 'pointer',
+                                fontSize: '14px'
+                            }}
+                        >
+                            <option value="Easy">Easy</option>
+                            <option value="Medium">Medium</option>
+                            <option value="Hard">Hard</option>
+                        </select>
+                    </div>
+                )}
 
                 <div style={{ marginBottom: '16px' }}>
                     <label style={{ display: 'block', fontSize: '12px', color: 'rgba(255,255,255,0.6)', marginBottom: '4px' }}>Volume</label>
@@ -420,10 +459,14 @@ const Game = () => {
                             }}
                         />
                     </div>
+
+
                 </div>
 
                 <div style={{ marginBottom: '16px' }}>
-                    <label style={{ display: 'block', fontSize: '12px', color: 'rgba(255,255,255,0.6)', marginBottom: '4px' }}>Play As</label>
+                    <label style={{ display: 'block', fontSize: '12px', color: 'rgba(255,255,255,0.6)', marginBottom: '4px' }}>
+                        {gameMode === 'ai' ? 'Play As' : 'Board Orientation'}
+                    </label>
                     <div style={{ display: 'flex', gap: '8px' }}>
                         <button
                             onClick={() => setPlayerColor('w')}
@@ -714,243 +757,249 @@ const Game = () => {
             }
 
             {/* Notification Modal */}
-            {notification && (
-                <div style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    height: '100%',
-                    background: 'rgba(0, 0, 0, 0.6)',
-                    backdropFilter: 'blur(5px)',
-                    zIndex: 3000,
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    animation: 'modalScale 0.3s ease-out'
-                }}>
+            {
+                notification && (
                     <div style={{
-                        background: 'rgba(30, 30, 30, 0.9)',
-                        backdropFilter: 'blur(20px)',
-                        padding: '30px',
-                        borderRadius: '20px',
-                        border: `2px solid ${notification.type === 'success' ? '#4CAF50' : notification.type === 'error' ? '#f44336' : '#FFD700'}`,
-                        boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
-                        textAlign: 'center',
-                        minWidth: '300px',
-                        maxWidth: '400px'
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%',
+                        background: 'rgba(0, 0, 0, 0.6)',
+                        backdropFilter: 'blur(5px)',
+                        zIndex: 3000,
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        animation: 'modalScale 0.3s ease-out'
                     }}>
                         <div style={{
-                            width: '60px',
-                            height: '60px',
-                            borderRadius: '50%',
-                            background: notification.type === 'success' ? 'rgba(76, 175, 80, 0.2)' : notification.type === 'error' ? 'rgba(244, 67, 54, 0.2)' : 'rgba(255, 215, 0, 0.2)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            margin: '0 auto 20px auto',
-                            color: notification.type === 'success' ? '#4CAF50' : notification.type === 'error' ? '#f44336' : '#FFD700'
+                            background: 'rgba(30, 30, 30, 0.9)',
+                            backdropFilter: 'blur(20px)',
+                            padding: '30px',
+                            borderRadius: '20px',
+                            border: `2px solid ${notification.type === 'success' ? '#4CAF50' : notification.type === 'error' ? '#f44336' : '#FFD700'}`,
+                            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
+                            textAlign: 'center',
+                            minWidth: '300px',
+                            maxWidth: '400px'
                         }}>
-                            {notification.type === 'success' ? <Check size={32} /> : notification.type === 'error' ? <X size={32} /> : <AlertTriangle size={32} />}
-                        </div>
+                            <div style={{
+                                width: '60px',
+                                height: '60px',
+                                borderRadius: '50%',
+                                background: notification.type === 'success' ? 'rgba(76, 175, 80, 0.2)' : notification.type === 'error' ? 'rgba(244, 67, 54, 0.2)' : 'rgba(255, 215, 0, 0.2)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                margin: '0 auto 20px auto',
+                                color: notification.type === 'success' ? '#4CAF50' : notification.type === 'error' ? '#f44336' : '#FFD700'
+                            }}>
+                                {notification.type === 'success' ? <Check size={32} /> : notification.type === 'error' ? <X size={32} /> : <AlertTriangle size={32} />}
+                            </div>
 
-                        <h3 style={{ margin: '0 0 10px 0', fontSize: '20px', color: 'white' }}>
-                            {notification.type === 'success' ? 'Success' : notification.type === 'error' ? 'Error' : 'Confirm Action'}
-                        </h3>
+                            <h3 style={{ margin: '0 0 10px 0', fontSize: '20px', color: 'white' }}>
+                                {notification.type === 'success' ? 'Success' : notification.type === 'error' ? 'Error' : 'Confirm Action'}
+                            </h3>
 
-                        <p style={{ margin: '0 0 24px 0', color: 'rgba(255, 255, 255, 0.8)', fontSize: '16px' }}>
-                            {notification.message}
-                        </p>
+                            <p style={{ margin: '0 0 24px 0', color: 'rgba(255, 255, 255, 0.8)', fontSize: '16px' }}>
+                                {notification.message}
+                            </p>
 
-                        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-                            {notification.type === 'confirm' ? (
-                                <>
+                            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                                {notification.type === 'confirm' ? (
+                                    <>
+                                        <button
+                                            onClick={() => setNotification(null)}
+                                            style={{
+                                                padding: '10px 20px',
+                                                borderRadius: '8px',
+                                                border: '1px solid rgba(255, 255, 255, 0.2)',
+                                                background: 'transparent',
+                                                color: 'white',
+                                                cursor: 'pointer',
+                                                fontSize: '14px',
+                                                fontWeight: 500
+                                            }}
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                notification.onConfirm?.();
+                                                // Don't close immediately if we want to show success message
+                                            }}
+                                            style={{
+                                                padding: '10px 20px',
+                                                borderRadius: '8px',
+                                                border: 'none',
+                                                background: '#FFD700',
+                                                color: 'black',
+                                                cursor: 'pointer',
+                                                fontSize: '14px',
+                                                fontWeight: 600
+                                            }}
+                                        >
+                                            Confirm
+                                        </button>
+                                    </>
+                                ) : (
                                     <button
                                         onClick={() => setNotification(null)}
                                         style={{
-                                            padding: '10px 20px',
-                                            borderRadius: '8px',
-                                            border: '1px solid rgba(255, 255, 255, 0.2)',
-                                            background: 'transparent',
-                                            color: 'white',
-                                            cursor: 'pointer',
-                                            fontSize: '14px',
-                                            fontWeight: 500
-                                        }}
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            notification.onConfirm?.();
-                                            // Don't close immediately if we want to show success message
-                                        }}
-                                        style={{
-                                            padding: '10px 20px',
+                                            padding: '10px 30px',
                                             borderRadius: '8px',
                                             border: 'none',
-                                            background: '#FFD700',
-                                            color: 'black',
+                                            background: notification.type === 'success' ? '#4CAF50' : '#f44336',
+                                            color: 'white',
                                             cursor: 'pointer',
                                             fontSize: '14px',
                                             fontWeight: 600
                                         }}
                                     >
-                                        Confirm
+                                        Close
                                     </button>
-                                </>
-                            ) : (
-                                <button
-                                    onClick={() => setNotification(null)}
-                                    style={{
-                                        padding: '10px 30px',
-                                        borderRadius: '8px',
-                                        border: 'none',
-                                        background: notification.type === 'success' ? '#4CAF50' : '#f44336',
-                                        color: 'white',
-                                        cursor: 'pointer',
-                                        fontSize: '14px',
-                                        fontWeight: 600
-                                    }}
-                                >
-                                    Close
-                                </button>
-                            )}
+                                )}
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Game Over Modal */}
-            {isGameOver && !showAnalysis && (
-                <div style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    height: '100%',
-                    background: 'rgba(0, 0, 0, 0.7)',
-                    backdropFilter: 'blur(8px)',
-                    zIndex: 2000,
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center'
-                }}>
+            {
+                isGameOver && !showAnalysis && (
                     <div style={{
-                        background: 'rgba(20, 20, 20, 0.9)',
-                        backdropFilter: 'blur(20px)',
-                        padding: '50px 70px',
-                        borderRadius: '24px',
-                        border: '2px solid rgba(255, 255, 255, 0.15)',
-                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.8)',
-                        textAlign: 'center'
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%',
+                        background: 'rgba(0, 0, 0, 0.7)',
+                        backdropFilter: 'blur(8px)',
+                        zIndex: 2000,
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center'
                     }}>
-                        {/* Inject CSS animations */}
-                        <style>{animationStyles}</style>
-
-                        <Trophy size={80} style={{
-                            marginBottom: '20px',
-                            color: winner === 'Draw' ? '#AAA' : '#FFD700',
-                            animation: winner === 'Draw'
-                                ? 'drawFloat 3s ease-in-out infinite'
-                                : winner === 'White' || winner === 'Black'
-                                    ? 'victoryBounce 2s ease-in-out infinite, victoryPulse 2s ease-in-out infinite'
-                                    : 'lossShake 0.5s ease-in-out infinite'
-                        }} />
-
-                        <h2 style={{
-                            fontSize: '48px',
-                            fontWeight: '800',
-                            margin: '0 0 10px 0',
-                            background: 'linear-gradient(135deg, #FFF 0%, #CCC 100%)',
-                            WebkitBackgroundClip: 'text',
-                            WebkitTextFillColor: 'transparent',
-                            letterSpacing: '-1px'
+                        <div style={{
+                            background: 'rgba(20, 20, 20, 0.9)',
+                            backdropFilter: 'blur(20px)',
+                            padding: '50px 70px',
+                            borderRadius: '24px',
+                            border: '2px solid rgba(255, 255, 255, 0.15)',
+                            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.8)',
+                            textAlign: 'center'
                         }}>
-                            {winner === 'Draw' ? 'Draw!' : 'Victory!'}
-                        </h2>
+                            {/* Inject CSS animations */}
+                            <style>{animationStyles}</style>
 
-                        <p style={{
-                            fontSize: '24px',
-                            color: 'rgba(255, 255, 255, 0.8)',
-                            margin: '0 0 40px 0',
-                            fontWeight: '500'
-                        }}>
-                            {winner === 'Draw' ? 'Game ended in a draw' : `${winner} wins the game!`}
-                        </p>
+                            <Trophy size={80} style={{
+                                marginBottom: '20px',
+                                color: winner === 'Draw' ? '#AAA' : '#FFD700',
+                                animation: winner === 'Draw'
+                                    ? 'drawFloat 3s ease-in-out infinite'
+                                    : winner === 'White' || winner === 'Black'
+                                        ? 'victoryBounce 2s ease-in-out infinite, victoryPulse 2s ease-in-out infinite'
+                                        : 'lossShake 0.5s ease-in-out infinite'
+                            }} />
 
-                        <button
-                            onClick={resetGame}
-                            onMouseOver={(e) => {
-                                e.currentTarget.style.transform = 'translateY(-2px)';
-                                e.currentTarget.style.boxShadow = '0 12px 24px rgba(76, 175, 80, 0.4)';
-                            }}
-                            onMouseOut={(e) => {
-                                e.currentTarget.style.transform = 'translateY(0)';
-                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
-                            }}
-                            style={{
-                                background: 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)',
-                                color: 'white',
-                                border: 'none',
-                                padding: '18px 40px',
-                                fontSize: '18px',
-                                fontWeight: '600',
-                                borderRadius: '12px',
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '12px',
-                                transition: 'all 0.2s ease',
-                                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
-                                marginRight: '15px'
-                            }}
-                        >
-                            <RotateCcw size={20} />
-                            Play Again
-                        </button>
+                            <h2 style={{
+                                fontSize: '48px',
+                                fontWeight: '800',
+                                margin: '0 0 10px 0',
+                                background: 'linear-gradient(135deg, #FFF 0%, #CCC 100%)',
+                                WebkitBackgroundClip: 'text',
+                                WebkitTextFillColor: 'transparent',
+                                letterSpacing: '-1px'
+                            }}>
+                                {winner === 'Draw' ? 'Draw!' : 'Victory!'}
+                            </h2>
 
-                        <button
-                            onClick={() => setShowAnalysis(true)}
-                            onMouseOver={(e) => {
-                                e.currentTarget.style.transform = 'translateY(-2px)';
-                                e.currentTarget.style.boxShadow = '0 12px 24px rgba(33, 150, 243, 0.4)';
-                            }}
-                            onMouseOut={(e) => {
-                                e.currentTarget.style.transform = 'translateY(0)';
-                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
-                            }}
-                            style={{
-                                background: 'linear-gradient(135deg, #2196F3 0%, #1976D2 100%)',
-                                color: 'white',
-                                border: 'none',
-                                padding: '18px 40px',
-                                fontSize: '18px',
-                                fontWeight: '600',
-                                borderRadius: '12px',
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '12px',
-                                transition: 'all 0.2s ease',
-                                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
-                            }}
-                        >
-                            📊 Analyze Game
-                        </button>
+                            <p style={{
+                                fontSize: '24px',
+                                color: 'rgba(255, 255, 255, 0.8)',
+                                margin: '0 0 40px 0',
+                                fontWeight: '500'
+                            }}>
+                                {winner === 'Draw' ? 'Game ended in a draw' : `${winner} wins the game!`}
+                            </p>
+
+                            <button
+                                onClick={resetGame}
+                                onMouseOver={(e) => {
+                                    e.currentTarget.style.transform = 'translateY(-2px)';
+                                    e.currentTarget.style.boxShadow = '0 12px 24px rgba(76, 175, 80, 0.4)';
+                                }}
+                                onMouseOut={(e) => {
+                                    e.currentTarget.style.transform = 'translateY(0)';
+                                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
+                                }}
+                                style={{
+                                    background: 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)',
+                                    color: 'white',
+                                    border: 'none',
+                                    padding: '18px 40px',
+                                    fontSize: '18px',
+                                    fontWeight: '600',
+                                    borderRadius: '12px',
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '12px',
+                                    transition: 'all 0.2s ease',
+                                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+                                    marginRight: '15px'
+                                }}
+                            >
+                                <RotateCcw size={20} />
+                                Play Again
+                            </button>
+
+                            <button
+                                onClick={() => setShowAnalysis(true)}
+                                onMouseOver={(e) => {
+                                    e.currentTarget.style.transform = 'translateY(-2px)';
+                                    e.currentTarget.style.boxShadow = '0 12px 24px rgba(33, 150, 243, 0.4)';
+                                }}
+                                onMouseOut={(e) => {
+                                    e.currentTarget.style.transform = 'translateY(0)';
+                                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
+                                }}
+                                style={{
+                                    background: 'linear-gradient(135deg, #2196F3 0%, #1976D2 100%)',
+                                    color: 'white',
+                                    border: 'none',
+                                    padding: '18px 40px',
+                                    fontSize: '18px',
+                                    fontWeight: '600',
+                                    borderRadius: '12px',
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '12px',
+                                    transition: 'all 0.2s ease',
+                                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
+                                }}
+                            >
+                                📊 Analyze Game
+                            </button>
+                        </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Game Analysis Modal */}
-            {showAnalysis && (
-                <GameAnalysis
-                    pgn={game.pgn()}
-                    winner={winner}
-                    onClose={() => setShowAnalysis(false)}
-                    onNavigateToMove={navigateToMove}
-                />
-            )}
+            {
+                showAnalysis && (
+                    <GameAnalysis
+                        pgn={game.pgn()}
+                        winner={winner}
+                        onClose={() => setShowAnalysis(false)}
+                        onNavigateToMove={navigateToMove}
+                    />
+                )
+            }
 
             <div style={{
                 position: 'absolute',
@@ -985,67 +1034,71 @@ const Game = () => {
             </div>
 
             {/* Save/Load Modal */}
-            {saveLoadMode && (
-                <SaveLoadModal
-                    mode={saveLoadMode}
-                    onClose={() => setSaveLoadMode(null)}
-                    onSave={(slotIndex) => {
-                        if (saveGame(slotIndex)) {
+            {
+                saveLoadMode && (
+                    <SaveLoadModal
+                        mode={saveLoadMode}
+                        onClose={() => setSaveLoadMode(null)}
+                        onSave={(slotIndex) => {
+                            if (saveGame(slotIndex)) {
+                                setNotification({
+                                    type: 'success',
+                                    message: `Game saved to Slot ${slotIndex + 1}!`
+                                });
+                                setTimeout(() => setNotification(null), 2000);
+                            }
+                            setSaveLoadMode(null);
+                        }}
+                        onLoad={(slotIndex) => {
+                            if (loadGame(slotIndex)) {
+                                setNotification({
+                                    type: 'success',
+                                    message: `Game loaded from Slot ${slotIndex + 1}!`
+                                });
+                                setTimeout(() => setNotification(null), 2000);
+                            } else {
+                                setNotification({
+                                    type: 'error',
+                                    message: 'Failed to load game.'
+                                });
+                                setTimeout(() => setNotification(null), 2000);
+                            }
+                            setSaveLoadMode(null);
+                        }}
+                        onDelete={(slotIndex) => {
+                            deleteSave(slotIndex);
                             setNotification({
                                 type: 'success',
-                                message: `Game saved to Slot ${slotIndex + 1}!`
+                                message: `Slot ${slotIndex + 1} deleted!`
                             });
                             setTimeout(() => setNotification(null), 2000);
-                        }
-                        setSaveLoadMode(null);
-                    }}
-                    onLoad={(slotIndex) => {
-                        if (loadGame(slotIndex)) {
-                            setNotification({
-                                type: 'success',
-                                message: `Game loaded from Slot ${slotIndex + 1}!`
-                            });
-                            setTimeout(() => setNotification(null), 2000);
-                        } else {
-                            setNotification({
-                                type: 'error',
-                                message: 'Failed to load game.'
-                            });
-                            setTimeout(() => setNotification(null), 2000);
-                        }
-                        setSaveLoadMode(null);
-                    }}
-                    onDelete={(slotIndex) => {
-                        deleteSave(slotIndex);
-                        setNotification({
-                            type: 'success',
-                            message: `Slot ${slotIndex + 1} deleted!`
-                        });
-                        setTimeout(() => setNotification(null), 2000);
-                    }}
-                />
-            )}
+                        }}
+                    />
+                )
+            }
 
             {/* PGN Modal */}
-            {pgnMode && (
-                <PGNModal
-                    mode={pgnMode}
-                    currentPGN={game.pgn()}
-                    onClose={() => setPGNMode(null)}
-                    onImport={(pgn) => {
-                        const success = importPGN(pgn);
-                        if (success) {
-                            setNotification({
-                                type: 'success',
-                                message: 'Game imported successfully!'
-                            });
-                            setTimeout(() => setNotification(null), 2000);
-                        }
-                        return success;
-                    }}
-                />
-            )}
-        </div>
+            {
+                pgnMode && (
+                    <PGNModal
+                        mode={pgnMode}
+                        currentPGN={game.pgn()}
+                        onClose={() => setPGNMode(null)}
+                        onImport={(pgn) => {
+                            const success = importPGN(pgn);
+                            if (success) {
+                                setNotification({
+                                    type: 'success',
+                                    message: 'Game imported successfully!'
+                                });
+                                setTimeout(() => setNotification(null), 2000);
+                            }
+                            return success;
+                        }}
+                    />
+                )
+            }
+        </div >
     );
 };
 

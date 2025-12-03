@@ -13,6 +13,7 @@ export interface PieceState {
 }
 
 export type Difficulty = 'Easy' | 'Medium' | 'Hard';
+export type GameMode = 'ai' | 'local';
 
 interface SavedGame {
     fen: string;
@@ -29,6 +30,7 @@ interface SavedGame {
     playerColor: 'w' | 'b';
     volume: number;
     isMuted: boolean;
+    gameMode: GameMode;
 }
 
 const PIECE_VALUES: Record<string, number> = {
@@ -64,6 +66,7 @@ export const useChessGame = () => {
     const [winner, setWinner] = useState<string | null>(null);
     const [pieces, setPieces] = useState<PieceState[]>([]);
     const [difficulty, setDifficulty] = useState<Difficulty>('Easy');
+    const [gameMode, setGameMode] = useState<GameMode>('ai');
     const [history, setHistory] = useState<string[]>([]);
     const [undoneMoves, setUndoneMoves] = useState<string[]>([]); // Stack for redo
     const [evaluation, setEvaluation] = useState(0);
@@ -281,7 +284,7 @@ export const useChessGame = () => {
             // Check for promotion
             const piece = gameCopy.get(from);
             if (
-                !isAI &&
+                !isAI && gameMode === 'ai' &&
                 piece?.type === 'p' &&
                 ((piece.color === 'w' && to[1] === '8') || (piece.color === 'b' && to[1] === '1'))
             ) {
@@ -381,8 +384,8 @@ export const useChessGame = () => {
             if (bestMove) {
                 // Only process AI moves when it's actually the AI's turn
                 // This prevents the AI from playing both sides
-                if (game.turn() === playerColor) {
-                    console.log('[Hook] Ignoring AI move - it is the player\'s turn');
+                if (game.turn() === playerColor || gameMode === 'local') {
+                    console.log('[Hook] Ignoring AI move - it is the player\'s turn or local mode');
                     return;
                 }
 
@@ -452,7 +455,7 @@ export const useChessGame = () => {
 
     // Auto-update hint when game state changes or showHint is toggled
     useEffect(() => {
-        if (showHint && !isGameOver && worker && game.turn() === playerColor) {
+        if (showHint && !isGameOver && worker && (gameMode === 'local' || game.turn() === playerColor)) {
             worker.postMessage({
                 fen: game.fen(),
                 pgn: game.pgn(),
@@ -554,7 +557,7 @@ export const useChessGame = () => {
     }, [game, undoneMoves, playerColor]);
 
     const makeAIMove = useCallback(() => {
-        if (game.turn() === playerColor || isGameOver || !worker) return;
+        if (game.turn() === playerColor || isGameOver || !worker || gameMode === 'local') return;
 
         // Post message to worker
         worker.postMessage({
@@ -567,14 +570,14 @@ export const useChessGame = () => {
 
     // AI Move Effect - White always moves first (standard chess)
     useEffect(() => {
-        const isAITurn = !isGameOver && game.turn() !== playerColor;
+        const isAITurn = !isGameOver && game.turn() !== playerColor && gameMode === 'ai';
         const canAIMove = game.history().length > 0 || (playerColor === 'b' && game.history().length === 0);
 
         if (isAITurn && canAIMove) {
             const timer = setTimeout(makeAIMove, 500);
             return () => clearTimeout(timer);
         }
-    }, [game, isGameOver, playerColor, makeAIMove]);
+    }, [game, isGameOver, playerColor, makeAIMove, gameMode]);
 
     const resetGame = useCallback(() => {
         const newGame = new Chess();
@@ -632,7 +635,8 @@ export const useChessGame = () => {
             blackTime,
             playerColor,
             volume,
-            isMuted
+            isMuted,
+            gameMode
         };
 
         // Add metadata
@@ -651,7 +655,7 @@ export const useChessGame = () => {
         setHasSavedGame(hasAnySave);
 
         return true;
-    }, [game, isGameOver, winner, difficulty, history, undoneMoves, evaluation, whiteTime, blackTime, playerColor, volume, isMuted]);
+    }, [game, isGameOver, winner, difficulty, history, undoneMoves, evaluation, whiteTime, blackTime, playerColor, volume, isMuted, gameMode]);
 
     const loadGame = useCallback((slotIndex: number = 0) => {
         const savedData = localStorage.getItem(`chess_save_slot_${slotIndex}`);
@@ -679,6 +683,7 @@ export const useChessGame = () => {
             setPlayerColor(state.playerColor);
             setVolume(state.volume);
             setIsMuted(state.isMuted);
+            setGameMode(state.gameMode || 'ai');
 
             // Restore Pieces Visuals
             syncPiecesWithBoard(loadedGame.board());
@@ -798,6 +803,8 @@ export const useChessGame = () => {
         getPossibleMoves,
         playerColor,
         setPlayerColor,
+        gameMode,
+        setGameMode,
         hintMove,
         showHint,
         showThreats,
