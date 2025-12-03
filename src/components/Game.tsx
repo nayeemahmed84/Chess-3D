@@ -258,7 +258,7 @@ const Game = () => {
             <div style={{
                 position: 'absolute',
                 top: 30,
-                left: isPanelVisible ? 60 : -300,
+                left: isPanelVisible ? 60 : -400,
                 color: 'white',
                 background: 'rgba(255, 255, 255, 0.1)',
                 backdropFilter: 'blur(10px)',
@@ -270,8 +270,18 @@ const Game = () => {
                 fontFamily: "'Inter', sans-serif",
                 minWidth: '200px',
                 transition: 'left 0.3s ease',
-                zIndex: 100
+                zIndex: 100,
+                maxHeight: 'calc(100vh - 60px)',
+                overflowY: 'auto',
+                scrollbarWidth: 'none', // Hide scrollbar for Firefox
+                msOverflowStyle: 'none',  // Hide scrollbar for IE/Edge
+                boxSizing: 'border-box'
             }}>
+                <style>{`
+                    div::-webkit-scrollbar {
+                        display: none; /* Hide scrollbar for Chrome/Safari/Opera */
+                    }
+                `}</style>
                 {/* Toggle Button */}
                 <button
                     onClick={() => setIsPanelVisible(!isPanelVisible)}
