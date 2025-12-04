@@ -15,6 +15,13 @@ An immersive 3D chess experience built with React, Three.js, and TypeScript, fea
 - **Move Highlighting** – Visual feedback for valid moves, check, last move, and hints
 - **Dynamic Camera** – Automatic camera rotation when playing as Black
 
+### 🌐 Online Multiplayer
+- **Peer-to-Peer** – Direct connection with friends using PeerJS (no server required)
+- **Real-time Updates** – Instant move transmission and board state synchronization
+- **Connection Status** – Visual indicators for connection state (Permanent & Popup notifications)
+- **Activity Indicators** – See opponent's piece selection and interactions in real-time
+- **Chat & Interaction** – (Coming soon)
+
 ### 🤖 AI & Gameplay
 - **AI Opponent** – Play against Stockfish-powered AI with 3 difficulty levels (Easy, Medium, Hard)
 - **Local Multiplayer** – Hotseat mode for two players on the same device
@@ -290,23 +297,6 @@ This project is licensed under the MIT License – see the [LICENSE](LICENSE) fi
 - **chess.js** for robust chess logic
 - **Three.js** community for 3D rendering excellence
 - **React Three Fiber** for seamless React integration
-
----
-
-## 🐛 Known Issues & Roadmap
-
-### Upcoming Features
-- Opening book integration
-- Online multiplayer
-- Chess960 support
-- Puzzle mode
-- Tournament mode
-
-### Performance
-- Analysis can take 10-30 seconds for longer games
-- Large game histories may impact performance
-
----
 
 **Enjoy playing! ♟️✨**
 
