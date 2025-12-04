@@ -1,7 +1,7 @@
 import Peer, { DataConnection } from 'peerjs';
 
 export interface MultiplayerData {
-    type: 'move' | 'game_start' | 'game_over' | 'chat' | 'interaction' | 'heartbeat';
+    type: 'move' | 'game_start' | 'game_over' | 'chat' | 'interaction' | 'heartbeat' | 'typing';
     payload: any;
 }
 
@@ -61,6 +61,18 @@ class MultiplayerService {
             if (typedData.type === 'heartbeat') {
                 this.lastHeartbeatReceived = Date.now();
                 console.log('[Heartbeat] Received from peer');
+                return;
+            }
+
+            // Handle chat messages
+            if (typedData.type === 'chat') {
+                window.dispatchEvent(new CustomEvent('chess-chat-message', { detail: typedData.payload }));
+                return;
+            }
+
+            // Handle typing status
+            if (typedData.type === 'typing') {
+                window.dispatchEvent(new CustomEvent('chess-chat-typing', { detail: typedData.payload }));
                 return;
             }
 

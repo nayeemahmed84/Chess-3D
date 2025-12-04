@@ -8,10 +8,8 @@ import { PGNModal } from './PGNModal';
 import { CapturedPieces } from './CapturedPieces';
 import { MultiplayerMenu } from './MultiplayerMenu';
 import { RotateCcw, RotateCw, Trophy, ChevronLeft, ChevronRight, Volume2, VolumeX, Maximize, Minimize, Save, Upload, Check, AlertTriangle, X, Download, Users } from 'lucide-react';
-
 import { open } from '@tauri-apps/plugin-shell';
-
-// CSS Keyframe Animations
+import Chat from './Chat';
 const animationStyles = `
 @keyframes victoryBounce {
     0%, 100% { transform: translateY(0) scale(1); }
@@ -55,6 +53,7 @@ const Game = () => {
     const [saveLoadMode, setSaveLoadMode] = useState<'save' | 'load' | null>(null);
     const [pgnMode, setPGNMode] = useState<'export' | 'import' | null>(null);
     const [showMultiplayerMenu, setShowMultiplayerMenu] = useState(false);
+    const [isChatOpen, setIsChatOpen] = useState(false);
     const [notification, setNotification] = useState<{ type: 'success' | 'confirm' | 'error', message: string, onConfirm?: () => void } | null>(null);
     const [connectionStatusMessage, setConnectionStatusMessage] = useState<'connected' | 'disconnected' | null>(null);
 
@@ -1315,6 +1314,15 @@ const Game = () => {
                         {connectionStatusMessage === 'connected' ? 'Opponent Connected' : 'Opponent Disconnected'}
                     </span>
                 </div>
+            )}
+
+            {/* Encrypted Chat */}
+            {gameMode === 'online' && (
+                <Chat
+                    isOpen={isChatOpen}
+                    onToggle={() => setIsChatOpen(!isChatOpen)}
+                    isOpponentConnected={isOpponentConnected}
+                />
             )}
         </div >
     );
