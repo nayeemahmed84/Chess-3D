@@ -1,7 +1,7 @@
 import Peer, { DataConnection } from 'peerjs';
 
 export interface MultiplayerData {
-    type: 'move' | 'game_start' | 'game_over' | 'chat' | 'interaction' | 'heartbeat' | 'typing';
+    type: 'move' | 'game_start' | 'game_over' | 'chat' | 'interaction' | 'heartbeat' | 'typing' | 'reaction' | 'image' | 'chat_clear';
     payload: any;
 }
 
@@ -73,6 +73,24 @@ class MultiplayerService {
             // Handle typing status
             if (typedData.type === 'typing') {
                 window.dispatchEvent(new CustomEvent('chess-chat-typing', { detail: typedData.payload }));
+                return;
+            }
+
+            // Handle reactions
+            if (typedData.type === 'reaction') {
+                window.dispatchEvent(new CustomEvent('chess-chat-reaction', { detail: typedData.payload }));
+                return;
+            }
+
+            // Handle images
+            if (typedData.type === 'image') {
+                window.dispatchEvent(new CustomEvent('chess-chat-image', { detail: typedData.payload }));
+                return;
+            }
+
+            // Handle clear chat history
+            if (typedData.type === 'chat_clear') {
+                window.dispatchEvent(new CustomEvent('chess-chat-clear', { detail: typedData.payload }));
                 return;
             }
 

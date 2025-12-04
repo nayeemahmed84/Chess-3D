@@ -1,13 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, X, MessageCircle, Lock, Shield } from 'lucide-react';
+import { Send, X, MessageCircle, Lock, Shield, Smile, Paperclip, Trash2 } from 'lucide-react';
+import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { multiplayerService } from '../services/MultiplayerService';
 import messageSoundUrl from '../assets/sounds/message.mp3';
+
+interface Reaction {
+    emoji: string;
+    count: number;
+    userReacted: boolean;
+}
 
 interface Message {
     id: string;
     sender: 'me' | 'opponent';
-    text: string;
+    text?: string;
+    image?: string;
     timestamp: number;
+    reactions: { [emoji: string]: Reaction };
 }
 
 interface ChatProps {
@@ -25,40 +34,50 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
     const typingTimeoutRef = useRef<number | null>(null);
     const notificationSound = useRef(new Audio(messageSoundUrl));
 
-    // Auto-scroll to bottom
+    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+    const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
 
     useEffect(() => {
         scrollToBottom();
-    }, [messages, isOpen]);
+    }, [messages, isOpen, isTyping]);
 
-    // Reset unread count when opened
     useEffect(() => {
         if (isOpen) {
             setUnreadCount(0);
         }
     }, [isOpen]);
 
-    // Handle incoming messages via custom event
     useEffect(() => {
-        const handleChatEvent = (e: CustomEvent<string>) => {
+        const handleChatEvent = (e: CustomEvent<{ text: string, id: string, timestamp: number }>) => {
             const newMessage: Message = {
-                id: Date.now().toString(),
+                id: e.detail.id,
                 sender: 'opponent',
-                text: e.detail,
-                timestamp: Date.now()
+                text: e.detail.text,
+                timestamp: e.detail.timestamp,
+                reactions: {}
             };
             setMessages(prev => [...prev, newMessage]);
-
-            // Play sound
-            notificationSound.current.currentTime = 0;
-            notificationSound.current.play().catch(e => console.log('Audio play failed:', e));
-
+            playSound();
             if (!isOpen) setUnreadCount(prev => prev + 1);
+            setIsTyping(false);
+        };
 
-            // Clear typing indicator when message received
+        const handleImageEvent = (e: CustomEvent<{ image: string, id: string, timestamp: number }>) => {
+            const newMessage: Message = {
+                id: e.detail.id,
+                sender: 'opponent',
+                image: e.detail.image,
+                timestamp: e.detail.timestamp,
+                reactions: {}
+            };
+            setMessages(prev => [...prev, newMessage]);
+            playSound();
+            if (!isOpen) setUnreadCount(prev => prev + 1);
             setIsTyping(false);
         };
 
@@ -66,31 +85,86 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
             setIsTyping(e.detail);
         };
 
+        const handleReactionEvent = (e: CustomEvent<{ messageId: string, emoji: string, remove?: boolean }>) => {
+            const { messageId, emoji, remove } = e.detail;
+            if (remove) {
+                setMessages(prev => prev.map(msg => {
+                    if (msg.id === messageId && msg.reactions[emoji]) {
+                        const newCount = msg.reactions[emoji].count - 1;
+                        if (newCount === 0) {
+                            const { [emoji]: removed, ...remainingReactions } = msg.reactions;
+                            return { ...msg, reactions: remainingReactions };
+                        }
+                        return {
+                            ...msg,
+                            reactions: {
+                                ...msg.reactions,
+                                [emoji]: {
+                                    ...msg.reactions[emoji],
+                                    count: newCount
+                                }
+                            }
+                        };
+                    }
+                    return msg;
+                }));
+            } else {
+                addReaction(messageId, emoji, false);
+            }
+            // Play sound for reaction
+            playSound();
+        };
+
+        const handleClearHistoryEvent = () => {
+            setMessages([]);
+        };
+
         window.addEventListener('chess-chat-message' as any, handleChatEvent as any);
+        window.addEventListener('chess-chat-image' as any, handleImageEvent as any);
         window.addEventListener('chess-chat-typing' as any, handleTypingEvent as any);
+        window.addEventListener('chess-chat-reaction' as any, handleReactionEvent as any);
+        window.addEventListener('chess-chat-clear' as any, handleClearHistoryEvent as any);
 
         return () => {
             window.removeEventListener('chess-chat-message' as any, handleChatEvent as any);
+            window.removeEventListener('chess-chat-image' as any, handleImageEvent as any);
             window.removeEventListener('chess-chat-typing' as any, handleTypingEvent as any);
+            window.removeEventListener('chess-chat-reaction' as any, handleReactionEvent as any);
+            window.removeEventListener('chess-chat-clear' as any, handleClearHistoryEvent as any);
         };
     }, [isOpen]);
 
+    const playSound = () => {
+        try {
+            const audio = notificationSound.current;
+            audio.currentTime = 0;
+            const playPromise = audio.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(e => console.log('Audio play failed:', e));
+            }
+        } catch (error) {
+            console.log('Sound playback error:', error);
+        }
+    };
+
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setInputText(e.target.value);
+        sendTypingStatus(true);
+    };
 
-        // Send typing status
+    const sendTypingStatus = (isTyping: boolean) => {
         if (isOpponentConnected) {
-            multiplayerService.sendData({ type: 'typing', payload: true });
+            multiplayerService.sendData({ type: 'typing', payload: isTyping });
 
-            // Clear existing timeout
             if (typingTimeoutRef.current) {
                 window.clearTimeout(typingTimeoutRef.current);
             }
 
-            // Set new timeout to stop typing after 1 second of inactivity
-            typingTimeoutRef.current = window.setTimeout(() => {
-                multiplayerService.sendData({ type: 'typing', payload: false });
-            }, 1000);
+            if (isTyping) {
+                typingTimeoutRef.current = window.setTimeout(() => {
+                    multiplayerService.sendData({ type: 'typing', payload: false });
+                }, 1000);
+            }
         }
     };
 
@@ -98,24 +172,119 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
         e?.preventDefault();
         if (!inputText.trim() || !isOpponentConnected) return;
 
+        const messageId = Date.now().toString();
+        const timestamp = Date.now();
         const newMessage: Message = {
-            id: Date.now().toString(),
+            id: messageId,
             sender: 'me',
             text: inputText.trim(),
-            timestamp: Date.now()
+            timestamp: timestamp,
+            reactions: {}
         };
 
         setMessages(prev => [...prev, newMessage]);
         multiplayerService.sendData({
             type: 'chat',
-            payload: inputText.trim()
+            payload: { text: inputText.trim(), id: messageId, timestamp: timestamp }
         });
         setInputText('');
+        setShowEmojiPicker(false);
+    };
+
+    const onEmojiClick = (emojiData: EmojiClickData) => {
+        setInputText(prev => prev + emojiData.emoji);
+        setShowEmojiPicker(false);
+    };
+
+    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file && isOpponentConnected) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                const base64String = reader.result as string;
+                const messageId = Date.now().toString();
+                const timestamp = Date.now();
+                const newMessage: Message = {
+                    id: messageId,
+                    sender: 'me',
+                    image: base64String,
+                    timestamp: timestamp,
+                    reactions: {}
+                };
+                setMessages(prev => [...prev, newMessage]);
+                multiplayerService.sendData({
+                    type: 'image',
+                    payload: { image: base64String, id: messageId, timestamp: timestamp }
+                });
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const addReaction = (messageId: string, emoji: string, isMe: boolean) => {
+        setMessages(prev => prev.map(msg => {
+            if (msg.id === messageId) {
+                const existingReaction = msg.reactions[emoji];
+
+                if (existingReaction && (isMe ? existingReaction.userReacted : existingReaction.count > 0)) {
+                    const newCount = existingReaction.count - 1;
+                    if (newCount === 0) {
+                        const { [emoji]: removed, ...remainingReactions } = msg.reactions;
+                        return {
+                            ...msg,
+                            reactions: remainingReactions
+                        };
+                    }
+                    return {
+                        ...msg,
+                        reactions: {
+                            ...msg.reactions,
+                            [emoji]: {
+                                ...existingReaction,
+                                count: newCount,
+                                userReacted: isMe ? false : existingReaction.userReacted
+                            }
+                        }
+                    };
+                }
+
+                return {
+                    ...msg,
+                    reactions: {
+                        ...msg.reactions,
+                        [emoji]: {
+                            emoji,
+                            count: (existingReaction?.count || 0) + 1,
+                            userReacted: isMe ? true : (existingReaction?.userReacted || false)
+                        }
+                    }
+                };
+            }
+            return msg;
+        }));
+    };
+
+    const handleReactionClick = (messageId: string, emoji: string) => {
+        if (!isOpponentConnected) return;
+
+        const message = messages.find(m => m.id === messageId);
+        const hasReacted = message?.reactions[emoji]?.userReacted;
+
+        addReaction(messageId, emoji, true);
+        multiplayerService.sendData({
+            type: 'reaction',
+            payload: { messageId, emoji, remove: hasReacted }
+        });
+    };
+
+    const handleClearHistory = () => {
+        if (!isOpponentConnected) return;
+        setMessages([]);
+        multiplayerService.sendData({ type: 'chat_clear', payload: true });
     };
 
     return (
         <>
-            {/* Floating Toggle Button */}
             <button
                 onClick={onToggle}
                 style={{
@@ -163,14 +332,13 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
                 )}
             </button>
 
-            {/* Chat Window */}
             {isOpen && (
                 <div style={{
                     position: 'absolute',
                     bottom: '80px',
                     left: '20px',
-                    width: '300px',
-                    height: '400px',
+                    width: '320px',
+                    height: '450px',
                     background: 'rgba(20, 20, 20, 0.95)',
                     backdropFilter: 'blur(20px)',
                     borderRadius: '16px',
@@ -182,7 +350,6 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
                     zIndex: 100,
                     animation: 'slideUp 0.3s ease-out'
                 }}>
-                    {/* Header */}
                     <div style={{
                         padding: '16px',
                         borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
@@ -195,15 +362,32 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
                             <Shield size={16} color="#4ade80" />
                             <span style={{ fontWeight: 600, fontSize: '14px', color: 'white' }}>Encrypted Chat</span>
                         </div>
-                        <button
-                            onClick={onToggle}
-                            style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}
-                        >
-                            <X size={18} />
-                        </button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <button
+                                onClick={handleClearHistory}
+                                disabled={!isOpponentConnected || messages.length === 0}
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: messages.length > 0 && isOpponentConnected ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.2)',
+                                    cursor: messages.length > 0 && isOpponentConnected ? 'pointer' : 'not-allowed',
+                                    padding: '4px',
+                                    display: 'flex',
+                                    alignItems: 'center'
+                                }}
+                                title="Clear chat history"
+                            >
+                                <Trash2 size={16} />
+                            </button>
+                            <button
+                                onClick={onToggle}
+                                style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
                     </div>
 
-                    {/* Security Notice */}
                     <div style={{
                         padding: '8px',
                         background: 'rgba(74, 222, 128, 0.1)',
@@ -219,7 +403,6 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
                         Messages are end-to-end encrypted and not saved.
                     </div>
 
-                    {/* Messages Area */}
                     <div style={{
                         flex: 1,
                         overflowY: 'auto',
@@ -236,20 +419,83 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
                             </div>
                         ) : (
                             messages.map(msg => (
-                                <div key={msg.id} style={{
-                                    alignSelf: msg.sender === 'me' ? 'flex-end' : 'flex-start',
-                                    maxWidth: '80%'
-                                }}>
+                                <div
+                                    key={msg.id}
+                                    style={{
+                                        alignSelf: msg.sender === 'me' ? 'flex-end' : 'flex-start',
+                                        maxWidth: '80%',
+                                        position: 'relative'
+                                    }}
+                                    onMouseEnter={() => setHoveredMessageId(msg.id)}
+                                    onMouseLeave={() => setHoveredMessageId(null)}
+                                >
                                     <div style={{
                                         background: msg.sender === 'me' ? '#3b82f6' : 'rgba(255, 255, 255, 0.1)',
-                                        padding: '8px 12px',
+                                        padding: msg.image ? '4px' : '8px 12px',
                                         borderRadius: msg.sender === 'me' ? '12px 12px 0 12px' : '12px 12px 12px 0',
                                         fontSize: '13px',
                                         color: 'white',
-                                        wordBreak: 'break-word'
+                                        wordBreak: 'break-word',
+                                        position: 'relative',
+                                        marginBottom: Object.values(msg.reactions).length > 0 ? '14px' : '0'
                                     }}>
-                                        {msg.text}
+                                        {msg.image ? (
+                                            <img src={msg.image} alt="Shared" style={{ maxWidth: '100%', borderRadius: '8px' }} />
+                                        ) : (
+                                            msg.text
+                                        )}
+
+                                        {Object.values(msg.reactions).length > 0 && (
+                                            <div style={{
+                                                position: 'absolute',
+                                                bottom: '-14px',
+                                                right: msg.sender === 'me' ? '0' : 'auto',
+                                                left: msg.sender === 'me' ? 'auto' : '0',
+                                                display: 'flex',
+                                                gap: '2px',
+                                                background: 'rgba(0,0,0,0.5)',
+                                                borderRadius: '10px',
+                                                padding: '2px 4px',
+                                                fontSize: '10px'
+                                            }}>
+                                                {Object.values(msg.reactions).map(r => (
+                                                    <span key={r.emoji}>{r.emoji} {r.count > 1 ? r.count : ''}</span>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
+
+                                    {hoveredMessageId === msg.id && (
+                                        <div style={{
+                                            position: 'absolute',
+                                            bottom: '-20px',
+                                            left: msg.sender === 'me' ? 'auto' : '0',
+                                            right: msg.sender === 'me' ? '0' : 'auto',
+                                            background: 'rgba(0,0,0,0.8)',
+                                            borderRadius: '12px',
+                                            padding: '2px',
+                                            display: 'flex',
+                                            gap: '4px',
+                                            zIndex: 10
+                                        }}>
+                                            {['👍', '❤️', '😂', '😮'].map(emoji => (
+                                                <button
+                                                    key={emoji}
+                                                    onClick={() => handleReactionClick(msg.id, emoji)}
+                                                    style={{
+                                                        background: 'none',
+                                                        border: 'none',
+                                                        cursor: 'pointer',
+                                                        fontSize: '14px',
+                                                        padding: '2px'
+                                                    }}
+                                                >
+                                                    {emoji}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+
                                     <div style={{
                                         fontSize: '10px',
                                         opacity: 0.4,
@@ -262,7 +508,6 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
                             ))
                         )}
 
-                        {/* Typing Indicator */}
                         {isTyping && (
                             <div style={{
                                 alignSelf: 'flex-start',
@@ -278,58 +523,113 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
                             }}>
                                 <span style={{ animation: 'bounce 1s infinite', animationDelay: '0s' }}>•</span>
                                 <span style={{ animation: 'bounce 1s infinite', animationDelay: '0.2s' }}>•</span>
-                                <span style={{ animation: 'bounce 1s infinite', animationDelay: '0.4s' }}>•</span>
+                                <span style={{ animation: ' bounce 1s infinite', animationDelay: '0.4s' }}>•</span>
                             </div>
                         )}
 
                         <div ref={messagesEndRef} />
                     </div>
 
-                    {/* Input Area */}
-                    <form onSubmit={handleSend} style={{
+                    <div style={{
                         padding: '12px',
                         borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-                        display: 'flex',
-                        gap: '8px',
-                        background: 'rgba(0, 0, 0, 0.2)'
+                        background: 'rgba(0, 0, 0, 0.2)',
+                        position: 'relative'
                     }}>
-                        <input
-                            type="text"
-                            value={inputText}
-                            onChange={handleInputChange}
-                            placeholder={isOpponentConnected ? "Type a message..." : "Opponent disconnected"}
-                            disabled={!isOpponentConnected}
-                            style={{
-                                flex: 1,
-                                background: 'rgba(255, 255, 255, 0.05)',
-                                border: '1px solid rgba(255, 255, 255, 0.1)',
-                                borderRadius: '20px',
-                                padding: '8px 16px',
-                                color: 'white',
-                                fontSize: '13px',
-                                outline: 'none'
-                            }}
-                        />
-                        <button
-                            type="submit"
-                            disabled={!inputText.trim() || !isOpponentConnected}
-                            style={{
-                                background: inputText.trim() && isOpponentConnected ? '#3b82f6' : 'rgba(255, 255, 255, 0.1)',
-                                border: 'none',
-                                width: '36px',
-                                height: '36px',
-                                borderRadius: '50%',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                color: 'white',
-                                cursor: inputText.trim() && isOpponentConnected ? 'pointer' : 'not-allowed',
-                                transition: 'all 0.2s ease'
-                            }}
-                        >
-                            <Send size={16} />
-                        </button>
-                    </form>
+                        {showEmojiPicker && (
+                            <div style={{ position: 'absolute', bottom: '60px', left: '10px', zIndex: 200 }}>
+                                <EmojiPicker
+                                    onEmojiClick={onEmojiClick}
+                                    theme={'dark' as any}
+                                    width={280}
+                                    height={300}
+                                />
+                            </div>
+                        )}
+
+                        <form onSubmit={handleSend} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                            <button
+                                type="button"
+                                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: 'rgba(255,255,255,0.6)',
+                                    cursor: 'pointer',
+                                    padding: '4px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    flexShrink: 0
+                                }}
+                            >
+                                <Smile size={18} />
+                            </button>
+
+                            <input
+                                type="file"
+                                ref={fileInputRef}
+                                style={{ display: 'none' }}
+                                accept="image/*"
+                                onChange={handleFileUpload}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: 'rgba(255,255,255,0.6)',
+                                    cursor: 'pointer',
+                                    padding: '4px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    flexShrink: 0
+                                }}
+                            >
+                                <Paperclip size={18} />
+                            </button>
+
+                            <input
+                                type="text"
+                                value={inputText}
+                                onChange={handleInputChange}
+                                placeholder={isOpponentConnected ? "Type a message..." : "Opponent disconnected"}
+                                disabled={!isOpponentConnected}
+                                style={{
+                                    flex: 1,
+                                    minWidth: 0,
+                                    background: 'rgba(255, 255, 255, 0.05)',
+                                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                                    borderRadius: '20px',
+                                    padding: '8px 12px',
+                                    color: 'white',
+                                    fontSize: '13px',
+                                    outline: 'none'
+                                }}
+                            />
+                            <button
+                                type="submit"
+                                disabled={!inputText.trim() || !isOpponentConnected}
+                                style={{
+                                    background: inputText.trim() && isOpponentConnected ? '#3b82f6' : 'rgba(255, 255, 255, 0.1)',
+                                    border: 'none',
+                                    minWidth: '36px',
+                                    width: '36px',
+                                    height: '36px',
+                                    borderRadius: '50%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: 'white',
+                                    cursor: inputText.trim() && isOpponentConnected ? 'pointer' : 'not-allowed',
+                                    transition: 'all 0.2s ease',
+                                    flexShrink: 0
+                                }}
+                            >
+                                <Send size={16} />
+                            </button>
+                        </form>
+                    </div>
                 </div>
             )}
         </>
