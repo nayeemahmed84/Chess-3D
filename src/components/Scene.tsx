@@ -17,6 +17,7 @@ interface SceneProps {
     hintMove: { from: Square; to: Square } | null;
     attackedSquares: Square[];
     opponentSelection: Square | null;
+    isSpectator: boolean;
 }
 
 const CameraController = ({ playerColor }: { playerColor: 'w' | 'b' }) => {
@@ -33,7 +34,7 @@ const CameraController = ({ playerColor }: { playerColor: 'w' | 'b' }) => {
     return null;
 };
 
-export const Scene = ({ onMove, turn, getPossibleMoves, pieces, lastMove, checkSquare, playerColor, hintMove, attackedSquares, opponentSelection }: SceneProps) => {
+export const Scene = ({ onMove, turn, getPossibleMoves, pieces, lastMove, checkSquare, playerColor, hintMove, attackedSquares, opponentSelection, isSpectator }: SceneProps) => {
     const [isInteracting, setIsInteracting] = useState(false);
 
     return (
@@ -60,6 +61,7 @@ export const Scene = ({ onMove, turn, getPossibleMoves, pieces, lastMove, checkS
                 attackedSquares={attackedSquares}
                 opponentSelection={opponentSelection}
                 onInteractionChange={setIsInteracting}
+                isSpectator={isSpectator}
             />
         </>
     );

@@ -86,6 +86,7 @@ export const useChessGame = (gameModeProp: 'local' | 'ai' = 'ai') => {
     const [hasSavedGame, setHasSavedGame] = useState(false);
     const [opponentSelection, setOpponentSelection] = useState<Square | null>(null);
     const [isOpponentConnected, setIsOpponentConnected] = useState(false);
+    const [isSpectator, setIsSpectator] = useState(false);
 
     const [capturedPieces, setCapturedPieces] = useState<{ white: string[], black: string[] }>({ white: [], black: [] });
     const [materialAdvantage, setMaterialAdvantage] = useState(0);
@@ -300,6 +301,12 @@ export const useChessGame = (gameModeProp: 'local' | 'ai' = 'ai') => {
     };
 
     const makeMove = useCallback((from: Square, to: Square, promotion: string = 'q', isAI = false) => {
+        // Block moves for spectators unless it's an incoming move (treated as AI/External)
+        if (isSpectator && !isAI) {
+            return false;
+        }
+
+
         try {
             const gameCopy = new Chess();
             gameCopy.loadPgn(game.pgn());
@@ -381,12 +388,10 @@ export const useChessGame = (gameModeProp: 'local' | 'ai' = 'ai') => {
 
     // Multiplayer Move Listener
     useEffect(() => {
-        const cleanupData = multiplayerService.onData((data) => {
+        const cleanupData = multiplayerService.onData((data, conn) => {
             if (data.type === 'move') {
                 const { from, to, promotion } = data.payload;
                 console.log('[Multiplayer] Received move:', from, to);
-                // Make the move on our board, set isAI=true to bypass some checks if needed, 
-                // but mostly to indicate it's not a local user interaction that needs sending back
                 makeMove(from, to, promotion, true);
             } else if (data.type === 'interaction') {
                 const { type, square } = data.payload;
@@ -395,17 +400,84 @@ export const useChessGame = (gameModeProp: 'local' | 'ai' = 'ai') => {
                 } else if (type === 'deselect') {
                     setOpponentSelection(null);
                 }
+            } else if (data.type === 'game_state_request') {
+                // We are Host, and a client (spectator or player) requested state
+                console.log('[Multiplayer] Received game state request from', conn.peer);
+
+                // Send current state
+                const currentFen = game.fen();
+                const currentHistory = game.history();
+                const currentTurn = game.turn();
+
+                multiplayerService.sendData({
+                    type: 'game_state_sync',
+                    payload: {
+                        fen: currentFen,
+                        history: currentHistory,
+                        turn: currentTurn,
+                        whiteTime,
+                        blackTime,
+                        capturedPieces,
+                        materialAdvantage,
+                        isGameOver,
+                        winner
+                    }
+                }, conn.peer);
+            } else if (data.type === 'game_state_sync') {
+                // We are Client (Spectator/Player) receiving state from Host
+                console.log('[Multiplayer] Received game state sync');
+                const { fen, history, turn, whiteTime: wTime, blackTime: bTime, capturedPieces: caps, materialAdvantage: mat, isGameOver: over, winner: win } = data.payload;
+
+                const newGame = new Chess(fen);
+                setGame(newGame);
+                setFen(fen);
+                setTurn(turn);
+                setHistory(history);
+                setWhiteTime(wTime);
+                setBlackTime(bTime);
+                setCapturedPieces(caps);
+                setMaterialAdvantage(mat);
+                setIsGameOver(over);
+                setWinner(win);
+                setEvaluation(evaluateBoard(newGame));
+                syncPiecesWithBoard(newGame.board());
             }
         });
 
-        const cleanupConnect = multiplayerService.onConnect(() => {
-            console.log('[useChessGame] Opponent connected');
+        const cleanupConnect = multiplayerService.onConnect((conn) => {
+            console.log('[useChessGame] Peer connected:', conn.peer, 'Metadata:', conn.metadata);
+
+            // Check if we are a spectator based on connection metadata if possible, 
+            // or rely on the fact that if we joined as spectator, we set the state elsewhere?
+            // Actually, `MultiplayerMenu` calls `connect`. 
+            // We need a way to set `isSpectator` when we join.
+            // We can expose a setter or handle it via a new method in the hook.
+            // For now, let's assume the component sets it via a prop or we infer it.
+            // Wait, `MultiplayerMenu` is outside `useChessGame`. 
+            // We need to expose `setIsSpectator` or a `joinGame` function.
+
+            // Let's check the metadata of the *outgoing* connection if we are the client.
+            // But PeerJS doesn't easily expose "my outgoing connection metadata" on the connection object itself in a unified way for all cases.
+            // However, we passed it in `connect`.
+
+            // Simpler: We'll add a `joinGame(id, role)` function to `useChessGame` 
+            // and move the connect logic there, OR just expose `setIsSpectator`.
+            // Exposing `setIsSpectator` is easiest for now given the structure.
+
             setIsOpponentConnected(true);
+
+            // If we are client (we have a connection and we are not host... how to know?), request state.
+            // We can just always request state on connect. Host will ignore if they are the one who accepted?
+            // Actually, `onConnect` fires for both.
+            // We can send 'game_state_request'.
+            multiplayerService.sendData({ type: 'game_state_request', payload: null }, conn.peer);
         });
 
         const cleanupDisconnect = multiplayerService.onDisconnect(() => {
-            console.log('[useChessGame] Opponent disconnected');
-            setIsOpponentConnected(false);
+            console.log('[useChessGame] Peer disconnected');
+            if (!multiplayerService.isConnected()) {
+                setIsOpponentConnected(false);
+            }
         });
 
         // Initialize connection state
@@ -416,11 +488,11 @@ export const useChessGame = (gameModeProp: 'local' | 'ai' = 'ai') => {
             cleanupConnect();
             cleanupDisconnect();
         };
-    }, [makeMove]);
+    }, [makeMove, game, whiteTime, blackTime, capturedPieces, materialAdvantage, isGameOver, winner]);
 
     // Send move if online
     const handleMultiplayerMove = (from: Square, to: Square, promotion?: string) => {
-        if (gameMode === 'online') {
+        if (gameMode === 'online' && !isSpectator) {
             multiplayerService.sendData({
                 type: 'move',
                 payload: { from, to, promotion }
@@ -434,7 +506,7 @@ export const useChessGame = (gameModeProp: 'local' | 'ai' = 'ai') => {
     };
 
     const handleSquareSelect = (square: Square | null) => {
-        if (gameMode === 'online') {
+        if (gameMode === 'online' && !isSpectator) {
             if (square) {
                 multiplayerService.sendData({
                     type: 'interaction',
@@ -1033,7 +1105,6 @@ export const useChessGame = (gameModeProp: 'local' | 'ai' = 'ai') => {
         loadGame,
         deleteSave,
         hasSavedGame,
-
         navigateToMove,
         importPGN,
         initialTime,
@@ -1041,6 +1112,8 @@ export const useChessGame = (gameModeProp: 'local' | 'ai' = 'ai') => {
         opening,
         opponentSelection,
         isOpponentConnected,
+        isSpectator,
+        setIsSpectator,
         handleSquareSelect
     };
 };

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { multiplayerService } from '../services/MultiplayerService';
-import { Copy, Check, Users, LogIn } from 'lucide-react';
+import { Copy, Check, Users, LogIn, Eye } from 'lucide-react';
 
 interface MultiplayerMenuProps {
-    onGameStart: (isHost: boolean) => void;
+    onGameStart: (isHost: boolean, role: 'player' | 'spectator') => void;
     onClose: () => void;
 }
 
@@ -13,30 +13,39 @@ export const MultiplayerMenu: React.FC<MultiplayerMenuProps> = ({ onGameStart, o
     const [status, setStatus] = useState<'idle' | 'connecting' | 'connected'>('idle');
     const [copied, setCopied] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [joinMode, setJoinMode] = useState<'player' | 'spectator'>('player');
 
     useEffect(() => {
         multiplayerService.initialize((id) => {
             setMyId(id);
         });
 
-        const cleanupConnect = multiplayerService.onConnect(() => {
-            setStatus('connected');
-            // Wait a moment then start game
-            setTimeout(() => {
-                // Determine who is white/black based on who initiated? 
-                // Usually host is white, joiner is black.
-                // We can handle this in the parent component or send a handshake.
-                // For now, let's assume if I have a connection and I didn't initiate it (incoming), I am host?
-                // Actually, let's just trigger callback. The service doesn't track who initiated easily without extra state.
-                // But we know if we clicked "Join", we are the client.
-            }, 1000);
+        // Listen for incoming connections (Host logic)
+        const cleanupConnect = multiplayerService.onConnect((conn) => {
+            // Only auto-start if we are NOT the one joining (i.e., we are the host)
+            // And if the connected peer is a player (not a spectator, unless we want to start for spectators too?)
+            // Actually, for host, we just want to know someone connected.
+            // If we are idle, we are host.
+            if (status === 'idle') {
+                setStatus('connected');
+                setTimeout(() => {
+                    // If we are host, we are always a player
+                    onGameStart(true, 'player');
+                }, 1000);
+            }
+        });
+
+        const cleanupError = multiplayerService.onError((err) => {
+            console.error('Multiplayer Error:', err);
+            setError(err);
+            setStatus('idle');
         });
 
         return () => {
-            // Don't destroy peer here, we want to keep it alive for the game
             cleanupConnect();
+            cleanupError();
         };
-    }, []);
+    }, [status, onGameStart]);
 
     const handleCopyId = () => {
         navigator.clipboard.writeText(myId);
@@ -44,52 +53,31 @@ export const MultiplayerMenu: React.FC<MultiplayerMenuProps> = ({ onGameStart, o
         setTimeout(() => setCopied(false), 2000);
     };
 
-    const handleJoin = () => {
+    const handleJoin = (role: 'player' | 'spectator') => {
         if (!peerIdInput) {
             setError('Please enter a Room ID');
             return;
         }
         setStatus('connecting');
+        setJoinMode(role);
         setError(null);
-        multiplayerService.connect(peerIdInput);
+
+        multiplayerService.connect(peerIdInput, { role });
 
         // Add timeout - if not connected in 10 seconds, show error
         setTimeout(() => {
             if (!multiplayerService.isConnected()) {
                 setError('Connection timed out. Please check the Room ID and try again.');
                 setStatus('idle');
-                setIsJoining(false);
+            } else {
+                // Connected successfully as client
+                setStatus('connected');
+                setTimeout(() => {
+                    onGameStart(false, role);
+                }, 1000);
             }
-        }, 10000);
+        }, 2000); // Short wait to allow connection to establish before checking/transitioning
     };
-
-
-
-    // Better approach for Host detection:
-    // We'll use a ref or state to track if we are joining.
-    const [isJoining, setIsJoining] = useState(false);
-
-    useEffect(() => {
-        const cleanupConnect = multiplayerService.onConnect(() => {
-            setStatus('connected');
-            setTimeout(() => {
-                onGameStart(!isJoining); // If not joining, we are host
-            }, 1000);
-        });
-
-        const cleanupError = multiplayerService.onError((err) => {
-            console.error('Multiplayer Error:', err);
-            setError(err);
-            setStatus('idle');
-            setIsJoining(false);
-        });
-
-        return () => {
-            cleanupConnect();
-            cleanupError();
-        };
-    }, [isJoining, onGameStart]);
-
 
     return (
         <div style={{
@@ -124,7 +112,7 @@ export const MultiplayerMenu: React.FC<MultiplayerMenuProps> = ({ onGameStart, o
                     <div style={{ textAlign: 'center', padding: '40px 0' }}>
                         <div style={{ fontSize: '40px', marginBottom: '20px' }}>🎮</div>
                         <h3>Connected!</h3>
-                        <p>Starting game...</p>
+                        <p>{joinMode === 'spectator' ? 'Joining as Spectator...' : 'Starting game...'}</p>
                     </div>
                 ) : (
                     <>
@@ -178,7 +166,7 @@ export const MultiplayerMenu: React.FC<MultiplayerMenuProps> = ({ onGameStart, o
                             <label style={{ display: 'block', fontSize: '12px', color: 'rgba(255,255,255,0.5)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '1px' }}>
                                 Join a Room
                             </label>
-                            <div style={{ display: 'flex', gap: '10px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                                 <input
                                     type="text"
                                     placeholder="Enter Friend's ID"
@@ -188,38 +176,61 @@ export const MultiplayerMenu: React.FC<MultiplayerMenuProps> = ({ onGameStart, o
                                         setError(null);
                                     }}
                                     style={{
-                                        flex: 1,
+                                        width: '100%',
                                         background: 'rgba(255,255,255,0.05)',
                                         border: error ? '1px solid #ff4444' : '1px solid rgba(255,255,255,0.1)',
                                         borderRadius: '8px',
                                         padding: '12px',
                                         color: 'white',
                                         fontSize: '16px',
-                                        outline: 'none'
+                                        outline: 'none',
+                                        boxSizing: 'border-box'
                                     }}
                                 />
-                                <button
-                                    onClick={() => {
-                                        setIsJoining(true);
-                                        handleJoin();
-                                    }}
-                                    disabled={status === 'connecting' || !peerIdInput}
-                                    style={{
-                                        background: '#4CAF50',
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '8px',
-                                        padding: '0 20px',
-                                        cursor: 'pointer',
-                                        fontWeight: 600,
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px',
-                                        opacity: (!peerIdInput || status === 'connecting') ? 0.5 : 1
-                                    }}
-                                >
-                                    {status === 'connecting' ? '...' : <><LogIn size={18} /> Join</>}
-                                </button>
+                                <div style={{ display: 'flex', gap: '10px' }}>
+                                    <button
+                                        onClick={() => handleJoin('player')}
+                                        disabled={status === 'connecting' || !peerIdInput}
+                                        style={{
+                                            flex: 1,
+                                            background: '#4CAF50',
+                                            color: 'white',
+                                            border: 'none',
+                                            borderRadius: '8px',
+                                            padding: '12px',
+                                            cursor: 'pointer',
+                                            fontWeight: 600,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '8px',
+                                            opacity: (!peerIdInput || status === 'connecting') ? 0.5 : 1
+                                        }}
+                                    >
+                                        {status === 'connecting' && joinMode === 'player' ? '...' : <><LogIn size={18} /> Join Game</>}
+                                    </button>
+                                    <button
+                                        onClick={() => handleJoin('spectator')}
+                                        disabled={status === 'connecting' || !peerIdInput}
+                                        style={{
+                                            flex: 1,
+                                            background: 'rgba(255, 255, 255, 0.1)',
+                                            color: 'white',
+                                            border: '1px solid rgba(255, 255, 255, 0.2)',
+                                            borderRadius: '8px',
+                                            padding: '12px',
+                                            cursor: 'pointer',
+                                            fontWeight: 600,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '8px',
+                                            opacity: (!peerIdInput || status === 'connecting') ? 0.5 : 1
+                                        }}
+                                    >
+                                        {status === 'connecting' && joinMode === 'spectator' ? '...' : <><Eye size={18} /> Watch</>}
+                                    </button>
+                                </div>
                             </div>
                             {error && <p style={{ color: '#ff4444', fontSize: '12px', marginTop: '8px' }}>{error}</p>}
                         </div>

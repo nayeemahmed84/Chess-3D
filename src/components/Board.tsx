@@ -15,9 +15,10 @@ interface BoardProps {
     attackedSquares: Square[];
     opponentSelection: Square | null;
     onInteractionChange: (isInteracting: boolean) => void;
+    isSpectator: boolean;
 }
 
-export const Board = ({ onMove, turn, getPossibleMoves, pieces, lastMove, checkSquare, hintMove, attackedSquares, opponentSelection, onInteractionChange }: BoardProps) => {
+export const Board = ({ onMove, turn, getPossibleMoves, pieces, lastMove, checkSquare, hintMove, attackedSquares, opponentSelection, onInteractionChange, isSpectator }: BoardProps) => {
     const [selectedSquare, setSelectedSquare] = useState<Square | null>(null);
     const [possibleMoves, setPossibleMoves] = useState<string[]>([]);
     const [draggedPiece, setDraggedPiece] = useState<{ id: string, type: string, color: string, startSquare: Square } | null>(null);
@@ -50,6 +51,8 @@ export const Board = ({ onMove, turn, getPossibleMoves, pieces, lastMove, checkS
     };
 
     const handleSquareClick = (squareName: Square) => {
+        if (isSpectator) return;
+
         if (selectedSquare) {
             if (selectedSquare === squareName) {
                 setSelectedSquare(null);
@@ -77,14 +80,17 @@ export const Board = ({ onMove, turn, getPossibleMoves, pieces, lastMove, checkS
     };
 
     const handlePieceInteractionStart = () => {
+        if (isSpectator) return;
         onInteractionChange(true);
     };
 
     const handlePieceInteractionEnd = () => {
+        if (isSpectator) return;
         onInteractionChange(false);
     };
 
     const handleDragStart = (piece: { id: string, type: string, color: string, square: Square }) => {
+        if (isSpectator) return;
         if (piece.color !== turn) return;
         // onInteractionChange(true); // Handled by onInteractionStart
         setDraggedPiece({ ...piece, startSquare: piece.square });
@@ -93,6 +99,7 @@ export const Board = ({ onMove, turn, getPossibleMoves, pieces, lastMove, checkS
     };
 
     const handleDragEnd = (_pieceId: string, endSquare: Square | null) => {
+        if (isSpectator) return;
         if (draggedPiece && endSquare && possibleMoves.includes(endSquare)) {
             onMove(draggedPiece.startSquare, endSquare);
         }

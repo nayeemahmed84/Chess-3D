@@ -44,7 +44,7 @@ const Game = () => {
         volume, setVolume, isMuted, toggleMute,
         saveGame, loadGame, deleteSave, hasSavedGame, game, navigateToMove, importPGN,
         gameMode, setGameMode, capturedPieces, materialAdvantage, initialTime, setInitialTime,
-        opening, opponentSelection, isOpponentConnected
+        opening, opponentSelection, isOpponentConnected, isSpectator, setIsSpectator
     } = useChessGame();
 
     const [isPanelVisible, setIsPanelVisible] = useState(true);
@@ -202,8 +202,38 @@ const Game = () => {
 
 
 
+    // Spectator Mode Banner
+    const SpectatorBanner = () => (
+        <div style={{
+            position: 'absolute',
+            top: '20px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'rgba(0, 0, 0, 0.8)',
+            backdropFilter: 'blur(10px)',
+            padding: '10px 20px',
+            borderRadius: '30px',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            zIndex: 1000,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.5)'
+        }}>
+            <div style={{
+                width: '10px',
+                height: '10px',
+                borderRadius: '50%',
+                background: '#FFD700',
+                boxShadow: '0 0 10px #FFD700'
+            }} />
+            <span style={{ color: 'white', fontWeight: 600, fontSize: '14px' }}>Spectator Mode</span>
+            <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>• You are watching</span>
+        </div>
+    );
     return (
         <div style={{ width: '100%', height: '100%', position: 'relative', background: '#1a1a1a' }}>
+            {isSpectator && <SpectatorBanner />}
             <Canvas shadows camera={{ position: [0, 8, 8], fov: 45 }}>
                 <color attach="background" args={['#1a1a1a']} />
                 <React.Suspense fallback={null}>
@@ -218,6 +248,7 @@ const Game = () => {
                         hintMove={hintMove}
                         attackedSquares={attackedSquares}
                         opponentSelection={opponentSelection}
+                        isSpectator={isSpectator}
                     />
                 </React.Suspense>
             </Canvas>
@@ -659,33 +690,35 @@ const Game = () => {
                     </div>
                 </div>
 
-                {/* Game Controls */}
-                <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-                    <button
-                        onClick={undoMove}
-                        title="Undo Move (←)"
-                        style={{
-                            flex: 1, padding: '8px', cursor: 'pointer',
-                            background: 'rgba(255, 255, 255, 0.1)', color: 'white',
-                            border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: '8px',
-                            display: 'flex', justifyContent: 'center', alignItems: 'center'
-                        }}
-                    >
-                        <RotateCcw size={14} />
-                    </button>
-                    <button
-                        onClick={redoMove}
-                        title="Redo Move (→)"
-                        style={{
-                            flex: 1, padding: '8px', cursor: 'pointer',
-                            background: 'rgba(255, 255, 255, 0.1)', color: 'white',
-                            border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: '8px',
-                            display: 'flex', justifyContent: 'center', alignItems: 'center'
-                        }}
-                    >
-                        <RotateCw size={14} />
-                    </button>
-                </div>
+                {/* Game Controls - Hide in Spectator Mode */}
+                {!isSpectator && (
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                        <button
+                            onClick={undoMove}
+                            title="Undo Move (←)"
+                            style={{
+                                flex: 1, padding: '8px', cursor: 'pointer',
+                                background: 'rgba(255, 255, 255, 0.1)', color: 'white',
+                                border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: '8px',
+                                display: 'flex', justifyContent: 'center', alignItems: 'center'
+                            }}
+                        >
+                            <RotateCcw size={14} />
+                        </button>
+                        <button
+                            onClick={redoMove}
+                            title="Redo Move (→)"
+                            style={{
+                                flex: 1, padding: '8px', cursor: 'pointer',
+                                background: 'rgba(255, 255, 255, 0.1)', color: 'white',
+                                border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: '8px',
+                                display: 'flex', justifyContent: 'center', alignItems: 'center'
+                            }}
+                        >
+                            <RotateCw size={14} />
+                        </button>
+                    </div>
+                )}
 
                 {/* Hint & Analysis Controls */}
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
@@ -756,31 +789,33 @@ const Game = () => {
                     </button>
                 </div>
 
-                <button
-                    onClick={resetGame}
-                    title="Reset Game (R)"
-                    style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: '100%',
-                        padding: '8px 12px',
-                        cursor: 'pointer',
-                        background: 'rgba(255, 255, 255, 0.1)',
-                        color: 'white',
-                        border: '1px solid rgba(255, 255, 255, 0.2)',
-                        borderRadius: '8px',
-                        fontWeight: 500,
-                        fontSize: '14px',
-                        transition: 'all 0.2s ease',
-                        marginBottom: '12px'
-                    }}
-                    onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
-                    onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
-                >
-                    <RotateCcw size={14} style={{ marginRight: '8px' }} />
-                    Reset Game
-                </button>
+                {!isSpectator && (
+                    <button
+                        onClick={resetGame}
+                        title="Reset Game (R)"
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '100%',
+                            padding: '8px 12px',
+                            cursor: 'pointer',
+                            background: 'rgba(255, 255, 255, 0.1)',
+                            color: 'white',
+                            border: '1px solid rgba(255, 255, 255, 0.2)',
+                            borderRadius: '8px',
+                            fontWeight: 500,
+                            fontSize: '14px',
+                            transition: 'all 0.2s ease',
+                            marginBottom: '12px'
+                        }}
+                        onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
+                        onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+                    >
+                        <RotateCcw size={14} style={{ marginRight: '8px' }} />
+                        Reset Game
+                    </button>
+                )}
 
                 {/* PGN Import/Export */}
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
@@ -1258,72 +1293,88 @@ const Game = () => {
                 )
             }
             {/* Multiplayer Menu */}
-            {showMultiplayerMenu && (
-                <MultiplayerMenu
-                    onClose={() => setShowMultiplayerMenu(false)}
-                    onGameStart={(isHost) => {
-                        setShowMultiplayerMenu(false);
-                        setGameMode('online');
-                        setPlayerColor(isHost ? 'w' : 'b');
-                        resetGame();
-                        setNotification({
-                            type: 'success',
-                            message: isHost ? 'Game Started! You are White.' : 'Connected! You are Black.'
-                        });
-                        setTimeout(() => setNotification(null), 3000);
-                    }}
-                />
-            )}
+            {
+                showMultiplayerMenu && (
+                    <MultiplayerMenu
+                        onClose={() => setShowMultiplayerMenu(false)}
+                        onGameStart={(isHost, role) => {
+                            setShowMultiplayerMenu(false);
+                            setGameMode('online');
+
+                            if (role === 'spectator') {
+                                setIsSpectator(true);
+                                // Spectators usually watch from white's perspective or neutral?
+                                // Let's default to white for now, or maybe we can add a toggle later.
+                                setPlayerColor('w');
+                            } else {
+                                setIsSpectator(false);
+                                setPlayerColor(isHost ? 'w' : 'b');
+                            }
+
+                            resetGame();
+                            setNotification({
+                                type: 'success',
+                                message: role === 'spectator' ? 'Joined as Spectator' : (isHost ? 'Game Started! You are White.' : 'Connected! You are Black.')
+                            });
+                            setTimeout(() => setNotification(null), 3000);
+                        }}
+                    />
+                )
+            }
 
             {/* Temporary Connection Status Popup - Right side, shows for 3 seconds */}
-            {gameMode === 'online' && connectionStatusMessage && (
-                <div style={{
-                    position: 'fixed',
-                    top: '20px',
-                    right: '20px',
-                    background: connectionStatusMessage === 'connected'
-                        ? 'linear-gradient(135deg, rgba(76, 175, 80, 0.25), rgba(76, 175, 80, 0.15))'
-                        : 'linear-gradient(135deg, rgba(239, 68, 68, 0.25), rgba(239, 68, 68, 0.15))',
-                    backdropFilter: 'blur(10px)',
-                    padding: '12px 18px',
-                    borderRadius: '12px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    color: 'white',
-                    fontSize: '14px',
-                    fontWeight: 600,
-                    border: `2px solid ${connectionStatusMessage === 'connected' ? 'rgba(76, 175, 80, 0.5)' : 'rgba(239, 68, 68, 0.5)'}`,
-                    boxShadow: connectionStatusMessage === 'connected'
-                        ? '0 4px 20px rgba(76, 175, 80, 0.3)'
-                        : '0 4px 20px rgba(239, 68, 68, 0.3)',
-                    zIndex: 3000
-                }}>
+            {
+                gameMode === 'online' && connectionStatusMessage && (
                     <div style={{
-                        width: '10px',
-                        height: '10px',
-                        borderRadius: '50%',
-                        background: connectionStatusMessage === 'connected' ? '#4ade80' : '#ef4444',
+                        position: 'fixed',
+                        top: '20px',
+                        right: '20px',
+                        background: connectionStatusMessage === 'connected'
+                            ? 'linear-gradient(135deg, rgba(76, 175, 80, 0.25), rgba(76, 175, 80, 0.15))'
+                            : 'linear-gradient(135deg, rgba(239, 68, 68, 0.25), rgba(239, 68, 68, 0.15))',
+                        backdropFilter: 'blur(10px)',
+                        padding: '12px 18px',
+                        borderRadius: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        color: 'white',
+                        fontSize: '14px',
+                        fontWeight: 600,
+                        border: `2px solid ${connectionStatusMessage === 'connected' ? 'rgba(76, 175, 80, 0.5)' : 'rgba(239, 68, 68, 0.5)'}`,
                         boxShadow: connectionStatusMessage === 'connected'
-                            ? '0 0 12px #4ade80'
-                            : '0 0 12px #ef4444'
-                    }} />
-                    <span style={{
-                        color: connectionStatusMessage === 'connected' ? '#4ade80' : '#ef4444'
+                            ? '0 4px 20px rgba(76, 175, 80, 0.3)'
+                            : '0 4px 20px rgba(239, 68, 68, 0.3)',
+                        zIndex: 3000
                     }}>
-                        {connectionStatusMessage === 'connected' ? 'Opponent Connected' : 'Opponent Disconnected'}
-                    </span>
-                </div>
-            )}
+                        <div style={{
+                            width: '10px',
+                            height: '10px',
+                            borderRadius: '50%',
+                            background: connectionStatusMessage === 'connected' ? '#4ade80' : '#ef4444',
+                            boxShadow: connectionStatusMessage === 'connected'
+                                ? '0 0 12px #4ade80'
+                                : '0 0 12px #ef4444'
+                        }} />
+                        <span style={{
+                            color: connectionStatusMessage === 'connected' ? '#4ade80' : '#ef4444'
+                        }}>
+                            {connectionStatusMessage === 'connected' ? 'Opponent Connected' : 'Opponent Disconnected'}
+                        </span>
+                    </div>
+                )
+            }
 
             {/* Encrypted Chat */}
-            {gameMode === 'online' && (
-                <Chat
-                    isOpen={isChatOpen}
-                    onToggle={() => setIsChatOpen(!isChatOpen)}
-                    isOpponentConnected={isOpponentConnected}
-                />
-            )}
+            {
+                gameMode === 'online' && (
+                    <Chat
+                        isOpen={isChatOpen}
+                        onToggle={() => setIsChatOpen(!isChatOpen)}
+                        isOpponentConnected={isOpponentConnected}
+                    />
+                )
+            }
         </div >
     );
 };
