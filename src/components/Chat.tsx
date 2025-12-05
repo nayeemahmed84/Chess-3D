@@ -25,6 +25,13 @@ interface ChatProps {
     isOpponentConnected: boolean;
 }
 
+const isOnlyEmojis = (text: string) => {
+    if (!text) return false;
+    const noSpace = text.replace(/\s/g, '');
+    if (noSpace.length === 0) return false;
+    return /^[\p{Extended_Pictographic}\u{1F3FB}-\u{1F3FF}\u{200D}\u{FE0F}]+$/u.test(noSpace);
+};
+
 const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) => {
     const [messages, setMessages] = useState<Message[]>([]);
     const [inputText, setInputText] = useState('');
@@ -430,10 +437,11 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
                                     onMouseLeave={() => setHoveredMessageId(null)}
                                 >
                                     <div style={{
-                                        background: msg.sender === 'me' ? '#3b82f6' : 'rgba(255, 255, 255, 0.1)',
-                                        padding: msg.image ? '4px' : '8px 12px',
+                                        background: (!msg.image && msg.text && isOnlyEmojis(msg.text)) ? 'transparent' : (msg.sender === 'me' ? '#3b82f6' : 'rgba(255, 255, 255, 0.1)'),
+                                        padding: (!msg.image && msg.text && isOnlyEmojis(msg.text)) ? '0' : (msg.image ? '4px' : '8px 12px'),
                                         borderRadius: msg.sender === 'me' ? '12px 12px 0 12px' : '12px 12px 12px 0',
-                                        fontSize: '13px',
+                                        fontSize: (!msg.image && msg.text && isOnlyEmojis(msg.text)) ? '48px' : '13px',
+                                        lineHeight: (!msg.image && msg.text && isOnlyEmojis(msg.text)) ? '1.2' : '1.5',
                                         color: 'white',
                                         wordBreak: 'break-word',
                                         position: 'relative',
@@ -448,18 +456,25 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
                                         {Object.values(msg.reactions).length > 0 && (
                                             <div style={{
                                                 position: 'absolute',
-                                                bottom: '-14px',
+                                                bottom: '-18px',
                                                 right: msg.sender === 'me' ? '0' : 'auto',
                                                 left: msg.sender === 'me' ? 'auto' : '0',
                                                 display: 'flex',
-                                                gap: '2px',
-                                                background: 'rgba(0,0,0,0.5)',
-                                                borderRadius: '10px',
-                                                padding: '2px 4px',
-                                                fontSize: '10px'
+                                                gap: '4px',
+                                                background: 'rgba(0, 0, 0, 0.6)',
+                                                backdropFilter: 'blur(4px)',
+                                                borderRadius: '16px',
+                                                padding: '4px 8px',
+                                                fontSize: '13px',
+                                                boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                                                alignItems: 'center',
+                                                border: '1px solid rgba(255,255,255,0.1)'
                                             }}>
                                                 {Object.values(msg.reactions).map(r => (
-                                                    <span key={r.emoji}>{r.emoji} {r.count > 1 ? r.count : ''}</span>
+                                                    <span key={r.emoji} style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                                                        <span style={{ fontSize: '14px' }}>{r.emoji}</span>
+                                                        {r.count > 1 && <span style={{ fontSize: '11px', fontWeight: 'bold' }}>{r.count}</span>}
+                                                    </span>
                                                 ))}
                                             </div>
                                         )}
@@ -468,15 +483,18 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
                                     {hoveredMessageId === msg.id && (
                                         <div style={{
                                             position: 'absolute',
-                                            bottom: '-20px',
+                                            bottom: '-35px',
                                             left: msg.sender === 'me' ? 'auto' : '0',
                                             right: msg.sender === 'me' ? '0' : 'auto',
-                                            background: 'rgba(0,0,0,0.8)',
-                                            borderRadius: '12px',
-                                            padding: '2px',
+                                            background: 'rgba(20, 20, 20, 0.9)',
+                                            backdropFilter: 'blur(8px)',
+                                            borderRadius: '24px',
+                                            padding: '4px 8px',
                                             display: 'flex',
-                                            gap: '4px',
-                                            zIndex: 10
+                                            gap: '6px',
+                                            zIndex: 20,
+                                            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                                            border: '1px solid rgba(255,255,255,0.1)'
                                         }}>
                                             {['👍', '❤️', '😂', '😮'].map(emoji => (
                                                 <button
@@ -486,9 +504,13 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
                                                         background: 'none',
                                                         border: 'none',
                                                         cursor: 'pointer',
-                                                        fontSize: '14px',
-                                                        padding: '2px'
+                                                        fontSize: '24px',
+                                                        padding: '4px',
+                                                        transition: 'transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                                                        lineHeight: 1
                                                     }}
+                                                    onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.3)'}
+                                                    onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
                                                 >
                                                     {emoji}
                                                 </button>
