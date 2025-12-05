@@ -3,6 +3,7 @@ import { Send, X, MessageCircle, Lock, Shield, Smile, Paperclip, Trash2 } from '
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { multiplayerService } from '../services/MultiplayerService';
 import messageSoundUrl from '../assets/sounds/message.mp3';
+import heic2any from 'heic2any';
 
 interface Reaction {
     emoji: string;
@@ -209,8 +210,28 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
         setShowEmojiPicker(false);
     };
 
-    const processFile = (file: File) => {
+    const processFile = async (file: File) => {
         if (!isOpponentConnected) return;
+
+        let fileToProcess = file;
+
+        // Handle HEIC/HEIF conversion
+        if (file.type === 'image/heic' ||
+            file.type === 'image/heif' ||
+            file.name.toLowerCase().endsWith('.heic') ||
+            file.name.toLowerCase().endsWith('.heif')) {
+            try {
+                const convertedBlob = await heic2any({
+                    blob: file,
+                    toType: 'image/jpeg',
+                    quality: 0.8
+                });
+                const blob = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
+                fileToProcess = new File([blob], file.name.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' });
+            } catch (error) {
+                console.error('HEIC conversion failed:', error);
+            }
+        }
 
         const reader = new FileReader();
         reader.onloadend = () => {
@@ -230,7 +251,7 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
                 payload: { image: base64String, id: messageId, timestamp: timestamp }
             });
         };
-        reader.readAsDataURL(file);
+        reader.readAsDataURL(fileToProcess);
     };
 
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -253,7 +274,7 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
         setIsDragging(false);
 
         const file = e.dataTransfer.files[0];
-        if (file && file.type.startsWith('image/')) {
+        if (file && (file.type.startsWith('image/') || /\.(heic|heif)$/i.test(file.name))) {
             processFile(file);
         }
     };
