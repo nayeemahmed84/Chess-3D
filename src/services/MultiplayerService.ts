@@ -1,47 +1,85 @@
 import Peer, { DataConnection } from 'peerjs';
 
 export interface MultiplayerData {
-    type: 'move' | 'game_start' | 'game_over' | 'chat' | 'interaction' | 'heartbeat' | 'typing' | 'reaction' | 'image' | 'chat_clear' | 'chat_delete';
+    type: 'move' | 'game_start' | 'game_over' | 'chat' | 'interaction' | 'heartbeat' | 'typing' | 'reaction' | 'image' | 'chat_clear' | 'chat_delete' | 'chat_read' | 'chat_edit';
     payload: any;
 }
 
 class MultiplayerService {
     private peer: Peer | null = null;
     private conn: DataConnection | null = null;
-    private onDataCallback: ((data: MultiplayerData) => void) | null = null;
-    private onConnectCallback: (() => void) | null = null;
-    private onDisconnectCallback: (() => void) | null = null;
+    private onDataCallbacks: ((data: MultiplayerData) => void)[] = [];
+    private onConnectCallbacks: (() => void)[] = [];
+    private onDisconnectCallbacks: (() => void)[] = [];
     private heartbeatInterval: number | null = null;
     private heartbeatTimeoutId: number | null = null;
     private lastHeartbeatReceived: number = 0;
 
     public myId: string = '';
 
+    private onErrorCallbacks: ((error: string) => void)[] = [];
+
     initialize(onId: (id: string) => void) {
-        if (this.peer) return;
+        if (this.peer) {
+            if (this.myId) {
+                onId(this.myId);
+            }
+            return;
+        }
 
         this.peer = new Peer();
+        console.log('[MultiplayerService] Initializing new Peer...');
 
         this.peer.on('open', (id) => {
-            console.log('My peer ID is: ' + id);
+            console.log('[MultiplayerService] ✓ Peer initialized successfully. My ID:', id);
             this.myId = id;
             onId(id);
         });
 
         this.peer.on('connection', (conn) => {
-            console.log('Incoming connection from: ' + conn.peer);
+            console.log('[MultiplayerService] ✓ Incoming connection from:', conn.peer);
             this.handleConnection(conn);
         });
 
         this.peer.on('error', (err) => {
-            console.error('PeerJS error:', err);
+            console.error('[MultiplayerService] ✗ PeerJS error:', err);
+            console.error('[MultiplayerService] Error type:', err.type);
+            this.triggerError(`Connection failed: ${err.type || 'Unknown error'}`);
         });
     }
 
     connect(peerId: string) {
-        if (!this.peer) return;
-        console.log('Connecting to: ' + peerId);
+        if (!this.peer) {
+            console.error('[MultiplayerService] Cannot connect: Peer not initialized');
+            this.triggerError('Peer service not initialized. Please refresh and try again.');
+            return;
+        }
+
+        if (this.peer.disconnected) {
+            console.error('[MultiplayerService] Cannot connect: Peer is disconnected from server');
+            this.triggerError('Not connected to server. Please wait a moment and try again.');
+            return;
+        }
+
+        if (!this.myId) {
+            console.error('[MultiplayerService] Cannot connect: myId not set yet');
+            this.triggerError('Still initializing. Please wait a moment and try again.');
+            return;
+        }
+
+        console.log('[MultiplayerService] My ID:', this.myId);
+        console.log('[MultiplayerService] Connecting to peer ID:', peerId);
+        console.log('[MultiplayerService] Peer state:', this.peer.disconnected ? 'disconnected' : 'connected');
+
         const conn = this.peer.connect(peerId);
+
+        if (!conn) {
+            console.error('[MultiplayerService] peer.connect() returned undefined');
+            this.triggerError('Failed to create connection. Please check the Room ID and try again.');
+            return;
+        }
+
+        console.log('[MultiplayerService] Connection object created:', conn);
         this.handleConnection(conn);
     }
 
@@ -50,73 +88,52 @@ class MultiplayerService {
 
         this.conn.on('open', () => {
             console.log('Connection established!');
-            if (this.onConnectCallback) this.onConnectCallback();
+            this.onConnectCallbacks.forEach(cb => cb());
             this.startHeartbeat();
         });
 
         this.conn.on('data', (data) => {
             const typedData = data as MultiplayerData;
 
-            // Handle heartbeat separately
             if (typedData.type === 'heartbeat') {
                 this.lastHeartbeatReceived = Date.now();
-                console.log('[Heartbeat] Received from peer');
                 return;
             }
+            if (typedData.type === 'chat') { window.dispatchEvent(new CustomEvent('chess-chat-message', { detail: typedData.payload })); return; }
+            if (typedData.type === 'typing') { window.dispatchEvent(new CustomEvent('chess-chat-typing', { detail: typedData.payload })); return; }
+            if (typedData.type === 'reaction') { window.dispatchEvent(new CustomEvent('chess-chat-reaction', { detail: typedData.payload })); return; }
+            if (typedData.type === 'image') { window.dispatchEvent(new CustomEvent('chess-chat-image', { detail: typedData.payload })); return; }
+            if (typedData.type === 'chat_clear') { window.dispatchEvent(new CustomEvent('chess-chat-clear', { detail: typedData.payload })); return; }
+            if (typedData.type === 'chat_delete') { window.dispatchEvent(new CustomEvent('chess-chat-delete', { detail: typedData.payload })); return; }
+            if (typedData.type === 'chat_read') { window.dispatchEvent(new CustomEvent('chess-chat-read', { detail: typedData.payload })); return; }
+            if (typedData.type === 'chat_edit') { window.dispatchEvent(new CustomEvent('chess-chat-edit', { detail: typedData.payload })); return; }
 
-            // Handle chat messages
-            if (typedData.type === 'chat') {
-                window.dispatchEvent(new CustomEvent('chess-chat-message', { detail: typedData.payload }));
-                return;
-            }
-
-            // Handle typing status
-            if (typedData.type === 'typing') {
-                window.dispatchEvent(new CustomEvent('chess-chat-typing', { detail: typedData.payload }));
-                return;
-            }
-
-            // Handle reactions
-            if (typedData.type === 'reaction') {
-                window.dispatchEvent(new CustomEvent('chess-chat-reaction', { detail: typedData.payload }));
-                return;
-            }
-
-            // Handle images
-            if (typedData.type === 'image') {
-                window.dispatchEvent(new CustomEvent('chess-chat-image', { detail: typedData.payload }));
-                return;
-            }
-
-            // Handle clear chat history
-            if (typedData.type === 'chat_clear') {
-                window.dispatchEvent(new CustomEvent('chess-chat-clear', { detail: typedData.payload }));
-                return;
-            }
-
-            // Handle individual message deletion
-            if (typedData.type === 'chat_delete') {
-                window.dispatchEvent(new CustomEvent('chess-chat-delete', { detail: typedData.payload }));
-                return;
-            }
-
-            console.log('Received data:', data);
-            if (this.onDataCallback) {
-                this.onDataCallback(typedData);
-            }
+            this.onDataCallbacks.forEach(cb => cb(typedData));
         });
 
         this.conn.on('close', () => {
             console.log('Connection closed');
             this.conn = null;
             this.stopHeartbeat();
-            if (this.onDisconnectCallback) this.onDisconnectCallback();
+            this.onDisconnectCallbacks.forEach(cb => cb());
         });
 
         this.conn.on('error', (err) => {
             console.error('Connection error:', err);
             this.triggerDisconnect();
+            this.triggerError(err.message || 'Connection Error');
         });
+    }
+
+    private triggerError(error: string) {
+        this.onErrorCallbacks.forEach(cb => cb(error));
+    }
+
+    onError(callback: (error: string) => void) {
+        this.onErrorCallbacks.push(callback);
+        return () => {
+            this.onErrorCallbacks = this.onErrorCallbacks.filter(cb => cb !== callback);
+        };
     }
 
     private startHeartbeat() {
@@ -164,9 +181,7 @@ class MultiplayerService {
             this.conn = null;
         }
 
-        if (this.onDisconnectCallback) {
-            this.onDisconnectCallback();
-        }
+        this.onDisconnectCallbacks.forEach(cb => cb());
     }
 
     sendData(data: MultiplayerData) {
@@ -178,19 +193,28 @@ class MultiplayerService {
     }
 
     onData(callback: (data: MultiplayerData) => void) {
-        this.onDataCallback = callback;
+        this.onDataCallbacks.push(callback);
+        return () => {
+            this.onDataCallbacks = this.onDataCallbacks.filter(cb => cb !== callback);
+        };
     }
 
     onConnect(callback: () => void) {
-        this.onConnectCallback = callback;
+        this.onConnectCallbacks.push(callback);
         // If already connected, fire the callback immediately
         if (this.conn && this.conn.open) {
             callback();
         }
+        return () => {
+            this.onConnectCallbacks = this.onConnectCallbacks.filter(cb => cb !== callback);
+        };
     }
 
     onDisconnect(callback: () => void) {
-        this.onDisconnectCallback = callback;
+        this.onDisconnectCallbacks.push(callback);
+        return () => {
+            this.onDisconnectCallbacks = this.onDisconnectCallbacks.filter(cb => cb !== callback);
+        };
     }
 
     isConnected(): boolean {

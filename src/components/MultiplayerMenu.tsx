@@ -19,7 +19,7 @@ export const MultiplayerMenu: React.FC<MultiplayerMenuProps> = ({ onGameStart, o
             setMyId(id);
         });
 
-        multiplayerService.onConnect(() => {
+        const cleanupConnect = multiplayerService.onConnect(() => {
             setStatus('connected');
             // Wait a moment then start game
             setTimeout(() => {
@@ -34,6 +34,7 @@ export const MultiplayerMenu: React.FC<MultiplayerMenuProps> = ({ onGameStart, o
 
         return () => {
             // Don't destroy peer here, we want to keep it alive for the game
+            cleanupConnect();
         };
     }, []);
 
@@ -49,13 +50,17 @@ export const MultiplayerMenu: React.FC<MultiplayerMenuProps> = ({ onGameStart, o
             return;
         }
         setStatus('connecting');
+        setError(null);
         multiplayerService.connect(peerIdInput);
-        // If connection successful, onConnect will fire
-        // We assume we are Black if we join
-        multiplayerService.onConnect(() => {
-            setStatus('connected');
-            setTimeout(() => onGameStart(false), 500); // false = not host (Black)
-        });
+
+        // Add timeout - if not connected in 10 seconds, show error
+        setTimeout(() => {
+            if (!multiplayerService.isConnected()) {
+                setError('Connection timed out. Please check the Room ID and try again.');
+                setStatus('idle');
+                setIsJoining(false);
+            }
+        }, 10000);
     };
 
 
@@ -65,12 +70,24 @@ export const MultiplayerMenu: React.FC<MultiplayerMenuProps> = ({ onGameStart, o
     const [isJoining, setIsJoining] = useState(false);
 
     useEffect(() => {
-        multiplayerService.onConnect(() => {
+        const cleanupConnect = multiplayerService.onConnect(() => {
             setStatus('connected');
             setTimeout(() => {
                 onGameStart(!isJoining); // If not joining, we are host
             }, 1000);
         });
+
+        const cleanupError = multiplayerService.onError((err) => {
+            console.error('Multiplayer Error:', err);
+            setError(err);
+            setStatus('idle');
+            setIsJoining(false);
+        });
+
+        return () => {
+            cleanupConnect();
+            cleanupError();
+        };
     }, [isJoining, onGameStart]);
 
 

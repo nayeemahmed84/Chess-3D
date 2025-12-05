@@ -381,7 +381,7 @@ export const useChessGame = (gameModeProp: 'local' | 'ai' = 'ai') => {
 
     // Multiplayer Move Listener
     useEffect(() => {
-        multiplayerService.onData((data) => {
+        const cleanupData = multiplayerService.onData((data) => {
             if (data.type === 'move') {
                 const { from, to, promotion } = data.payload;
                 console.log('[Multiplayer] Received move:', from, to);
@@ -398,18 +398,24 @@ export const useChessGame = (gameModeProp: 'local' | 'ai' = 'ai') => {
             }
         });
 
-        multiplayerService.onConnect(() => {
+        const cleanupConnect = multiplayerService.onConnect(() => {
             console.log('[useChessGame] Opponent connected');
             setIsOpponentConnected(true);
         });
 
-        multiplayerService.onDisconnect(() => {
+        const cleanupDisconnect = multiplayerService.onDisconnect(() => {
             console.log('[useChessGame] Opponent disconnected');
             setIsOpponentConnected(false);
         });
 
         // Initialize connection state
         setIsOpponentConnected(multiplayerService.isConnected());
+
+        return () => {
+            cleanupData();
+            cleanupConnect();
+            cleanupDisconnect();
+        };
     }, [makeMove]);
 
     // Send move if online

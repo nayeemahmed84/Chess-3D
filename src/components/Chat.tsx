@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, X, MessageCircle, Lock, Shield, Smile, Paperclip, Trash2, Loader } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import { Send, X, MessageCircle, Lock, Shield, Smile, Paperclip, Trash2, Loader, Download, ZoomIn, ZoomOut, Reply, Edit2, Check, CheckCheck } from 'lucide-react';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { multiplayerService } from '../services/MultiplayerService';
 import messageSoundUrl from '../assets/sounds/message.mp3';
@@ -18,6 +19,13 @@ interface Message {
     image?: string;
     timestamp: number;
     reactions: { [emoji: string]: Reaction };
+    read?: boolean;
+    edited?: boolean;
+    replyTo?: {
+        id: string;
+        text: string;
+        sender: string;
+    };
 }
 
 interface ChatProps {
@@ -31,6 +39,30 @@ const isOnlyEmojis = (text: string) => {
     const noSpace = text.replace(/\s/g, '');
     if (noSpace.length === 0) return false;
     return /^[\p{Extended_Pictographic}\u{1F3FB}-\u{1F3FF}\u{200D}\u{FE0F}]+$/u.test(noSpace);
+};
+
+const stripMetadata = (file: Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                reject(new Error('Failed to get canvas context'));
+                return;
+            }
+            ctx.drawImage(img, 0, 0);
+            resolve(canvas.toDataURL('image/jpeg', 0.8));
+            URL.revokeObjectURL(img.src);
+        };
+        img.onerror = (e) => {
+            URL.revokeObjectURL(img.src);
+            reject(e);
+        };
+        img.src = URL.createObjectURL(file);
+    });
 };
 
 const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) => {
@@ -47,6 +79,27 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isDragging, setIsDragging] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
+    const [selectedImage, setSelectedImage] = useState<{ src: string, id: string } | null>(null);
+    const [zoom, setZoom] = useState(1);
+    const [isPanning, setIsPanning] = useState(false);
+    const [startPan, setStartPan] = useState({ x: 0, y: 0, scrollLeft: 0, scrollTop: 0 });
+    const imageContainerRef = useRef<HTMLDivElement>(null);
+    const hasPanningMoved = useRef(false);
+
+    const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+    const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        const handleEsc = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                setSelectedImage(null);
+                setZoom(1);
+            }
+        };
+        window.addEventListener('keydown', handleEsc);
+        return () => window.removeEventListener('keydown', handleEsc);
+    }, []);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -62,6 +115,26 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
         }
     }, [isOpen]);
 
+    useEffect(() => {
+        if (isOpen && messages.length > 0) {
+            const unreadMessages = messages
+                .filter(m => m.sender === 'opponent' && !m.read)
+                .map(m => m.id);
+
+            if (unreadMessages.length > 0) {
+                // Optimistically update
+                setMessages(prev => prev.map(msg =>
+                    unreadMessages.includes(msg.id) ? { ...msg, read: true } : msg
+                ));
+
+                multiplayerService.sendData({
+                    type: 'chat_read',
+                    payload: { messageIds: unreadMessages }
+                });
+            }
+        }
+    }, [isOpen, messages.length]);
+
     const playSound = () => {
         try {
             const audio = notificationSound.current;
@@ -76,17 +149,29 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
     };
 
     useEffect(() => {
-        const handleChatEvent = (e: CustomEvent<{ text: string, id: string, timestamp: number }>) => {
+        const handleChatEvent = (e: CustomEvent<{ text: string, id: string, timestamp: number, replyTo?: any, edited?: boolean }>) => {
             const newMessage: Message = {
                 id: e.detail.id,
                 sender: 'opponent',
                 text: e.detail.text,
                 timestamp: e.detail.timestamp,
-                reactions: {}
+                reactions: {},
+                replyTo: e.detail.replyTo,
+                edited: e.detail.edited
             };
             setMessages(prev => [...prev, newMessage]);
             playSound();
-            if (!isOpen) setUnreadCount(prev => prev + 1);
+            if (!isOpen) {
+                setUnreadCount(prev => prev + 1);
+            } else {
+                // If chat is open, mark as read immediately
+                setTimeout(() => {
+                    multiplayerService.sendData({
+                        type: 'chat_read',
+                        payload: { messageIds: [newMessage.id] }
+                    });
+                }, 100);
+            }
             setIsTyping(false);
         };
 
@@ -100,7 +185,16 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
             };
             setMessages(prev => [...prev, newMessage]);
             playSound();
-            if (!isOpen) setUnreadCount(prev => prev + 1);
+            if (!isOpen) {
+                setUnreadCount(prev => prev + 1);
+            } else {
+                setTimeout(() => {
+                    multiplayerService.sendData({
+                        type: 'chat_read',
+                        payload: { messageIds: [newMessage.id] }
+                    });
+                }, 100);
+            }
             setIsTyping(false);
         };
 
@@ -141,6 +235,18 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
             setMessages([]);
         };
 
+        const handleReadEvent = (e: CustomEvent<{ messageIds: string[] }>) => {
+            setMessages(prev => prev.map(msg =>
+                e.detail.messageIds.includes(msg.id) ? { ...msg, read: true } : msg
+            ));
+        };
+
+        const handleEditEvent = (e: CustomEvent<{ id: string, text: string }>) => {
+            setMessages(prev => prev.map(msg =>
+                msg.id === e.detail.id ? { ...msg, text: e.detail.text, edited: true } : msg
+            ));
+        };
+
         const handleDeleteMessageEvent = (e: CustomEvent<string>) => {
             setMessages(prev => prev.filter(msg => msg.id !== e.detail));
         };
@@ -151,6 +257,8 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
         window.addEventListener('chess-chat-reaction' as any, handleReactionEvent as any);
         window.addEventListener('chess-chat-clear' as any, handleClearHistoryEvent as any);
         window.addEventListener('chess-chat-delete' as any, handleDeleteMessageEvent as any);
+        window.addEventListener('chess-chat-read' as any, handleReadEvent as any);
+        window.addEventListener('chess-chat-edit' as any, handleEditEvent as any);
 
         return () => {
             window.removeEventListener('chess-chat-message' as any, handleChatEvent as any);
@@ -159,6 +267,8 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
             window.removeEventListener('chess-chat-reaction' as any, handleReactionEvent as any);
             window.removeEventListener('chess-chat-clear' as any, handleClearHistoryEvent as any);
             window.removeEventListener('chess-chat-delete' as any, handleDeleteMessageEvent as any);
+            window.removeEventListener('chess-chat-read' as any, handleReadEvent as any);
+            window.removeEventListener('chess-chat-edit' as any, handleEditEvent as any);
         };
     }, [isOpen]);
 
@@ -187,6 +297,22 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
         e?.preventDefault();
         if (!inputText.trim() || !isOpponentConnected) return;
 
+        if (editingMessageId) {
+            // Handle Edit
+            setMessages(prev => prev.map(msg =>
+                msg.id === editingMessageId ? { ...msg, text: inputText.trim(), edited: true } : msg
+            ));
+
+            multiplayerService.sendData({
+                type: 'chat_edit',
+                payload: { id: editingMessageId, text: inputText.trim() }
+            });
+
+            setEditingMessageId(null);
+            setInputText('');
+            return;
+        }
+
         const messageId = Date.now().toString();
         const timestamp = Date.now();
         const newMessage: Message = {
@@ -194,15 +320,30 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
             sender: 'me',
             text: inputText.trim(),
             timestamp: timestamp,
-            reactions: {}
+            reactions: {},
+            replyTo: replyingTo ? {
+                id: replyingTo.id,
+                text: replyingTo.text || '[Image]',
+                sender: replyingTo.sender
+            } : undefined
         };
 
         setMessages(prev => [...prev, newMessage]);
         multiplayerService.sendData({
             type: 'chat',
-            payload: { text: inputText.trim(), id: messageId, timestamp: timestamp }
+            payload: {
+                text: inputText.trim(),
+                id: messageId,
+                timestamp: timestamp,
+                replyTo: replyingTo ? {
+                    id: replyingTo.id,
+                    text: replyingTo.text || '[Image]',
+                    sender: replyingTo.sender
+                } : undefined
+            }
         });
         setInputText('');
+        setReplyingTo(null);
         setShowEmojiPicker(false);
     };
 
@@ -215,31 +356,32 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
         if (!isOpponentConnected) return;
         setIsUploading(true);
 
-        let fileToProcess = file;
+        try {
+            let blobToProcess: Blob = file;
 
-        // Handle HEIC/HEIF conversion
-        if (file.type === 'image/heic' ||
-            file.type === 'image/heif' ||
-            file.name.toLowerCase().endsWith('.heic') ||
-            file.name.toLowerCase().endsWith('.heif')) {
-            try {
-                const convertedBlob = await heic2any({
-                    blob: file,
-                    toType: 'image/jpeg',
-                    quality: 0.8
-                });
-                const blob = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
-                fileToProcess = new File([blob], file.name.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' });
-            } catch (error) {
-                console.error('HEIC conversion failed:', error);
+            // Handle HEIC/HEIF conversion
+            if (file.type === 'image/heic' ||
+                file.type === 'image/heif' ||
+                file.name.toLowerCase().endsWith('.heic') ||
+                file.name.toLowerCase().endsWith('.heif')) {
+                try {
+                    const convertedBlob = await heic2any({
+                        blob: file,
+                        toType: 'image/jpeg',
+                        quality: 0.8
+                    });
+                    blobToProcess = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
+                } catch (error) {
+                    console.error('HEIC conversion failed:', error);
+                }
             }
-        }
 
-        const reader = new FileReader();
-        reader.onloadend = () => {
-            const base64String = reader.result as string;
+            // Strip metadata and get base64
+            const base64String = await stripMetadata(blobToProcess);
+
             const messageId = Date.now().toString();
             const timestamp = Date.now();
+
             const newMessage: Message = {
                 id: messageId,
                 sender: 'me',
@@ -252,9 +394,11 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
                 type: 'image',
                 payload: { image: base64String, id: messageId, timestamp: timestamp }
             });
+        } catch (error) {
+            console.error('Error processing image:', error);
+        } finally {
             setIsUploading(false);
-        };
-        reader.readAsDataURL(fileToProcess);
+        }
     };
 
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -352,6 +496,38 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
     };
 
 
+
+    const handleMouseDown = (e: React.MouseEvent) => {
+        if (zoom > 1 && imageContainerRef.current) {
+            setIsPanning(true);
+            hasPanningMoved.current = false;
+            setStartPan({
+                x: e.clientX,
+                y: e.clientY,
+                scrollLeft: imageContainerRef.current.scrollLeft,
+                scrollTop: imageContainerRef.current.scrollTop
+            });
+            e.preventDefault();
+        }
+    };
+
+    const handleMouseMove = (e: React.MouseEvent) => {
+        if (!isPanning || !imageContainerRef.current) return;
+        e.preventDefault();
+        const x = e.clientX - startPan.x;
+        const y = e.clientY - startPan.y;
+
+        if (Math.abs(x) > 5 || Math.abs(y) > 5) {
+            hasPanningMoved.current = true;
+        }
+
+        imageContainerRef.current.scrollLeft = startPan.scrollLeft - x;
+        imageContainerRef.current.scrollTop = startPan.scrollTop - y;
+    };
+
+    const handleMouseUp = () => {
+        setIsPanning(false);
+    };
 
     return (
         <>
@@ -553,9 +729,51 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
                                         marginBottom: Object.values(msg.reactions).length > 0 ? '14px' : '0'
                                     }}>
                                         {msg.image ? (
-                                            <img src={msg.image} alt="Shared" style={{ maxWidth: '100%', borderRadius: '8px' }} />
+                                            <img
+                                                src={msg.image}
+                                                alt="Shared"
+                                                style={{ maxWidth: '100%', borderRadius: '8px', cursor: 'zoom-in', display: 'block' }}
+                                                onClick={() => { setSelectedImage({ src: msg.image!, id: msg.id }); setZoom(1); }}
+                                            />
                                         ) : (
-                                            msg.text
+                                            msg.text && (
+                                                <div style={{ fontSize: (!msg.image && msg.text && isOnlyEmojis(msg.text)) ? '48px' : '13px' }}>
+                                                    {msg.replyTo && (
+                                                        <div style={{
+                                                            borderLeft: '2px solid rgba(255,255,255,0.3)',
+                                                            paddingLeft: '8px',
+                                                            marginBottom: '6px',
+                                                            fontSize: '11px',
+                                                            opacity: 0.7
+                                                        }}>
+                                                            <div style={{ fontWeight: 'bold' }}>{msg.replyTo.sender === 'me' ? 'You' : 'Opponent'}</div>
+                                                            <div style={{
+                                                                whiteSpace: 'nowrap',
+                                                                overflow: 'hidden',
+                                                                textOverflow: 'ellipsis',
+                                                                maxWidth: '150px'
+                                                            }}>
+                                                                {msg.replyTo.text}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    <ReactMarkdown
+                                                        components={{
+                                                            p: ({ children }) => <p style={{ margin: 0 }}>{children}</p>,
+                                                            code: ({ children }) => <code style={{ background: 'rgba(0,0,0,0.3)', padding: '2px 4px', borderRadius: '4px', fontFamily: 'monospace' }}>{children}</code>,
+                                                            pre: ({ children }) => <pre style={{ background: 'rgba(0,0,0,0.3)', padding: '8px', borderRadius: '4px', overflowX: 'auto', margin: '4px 0' }}>{children}</pre>,
+                                                            a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: '#60a5fa', textDecoration: 'underline' }}>{children}</a>
+                                                        }}
+                                                    >
+                                                        {msg.text}
+                                                    </ReactMarkdown>
+                                                    {msg.edited && (
+                                                        <span style={{ fontSize: '10px', opacity: 0.5, marginLeft: '4px', fontStyle: 'italic' }}>
+                                                            (edited)
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            )
                                         )}
 
                                         {Object.values(msg.reactions).length > 0 && (
@@ -625,6 +843,55 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
                                                 <div style={{ width: '1px', height: '24px', background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />
                                             )}
 
+
+                                            {/* Reply button - available for all messages */}
+                                            <button
+                                                onClick={() => {
+                                                    setReplyingTo(msg);
+                                                    inputRef.current?.focus();
+                                                }}
+                                                style={{
+                                                    background: 'none',
+                                                    border: 'none',
+                                                    cursor: 'pointer',
+                                                    color: 'rgba(255, 255, 255, 0.8)',
+                                                    padding: '4px',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    transition: 'transform 0.2s ease'
+                                                }}
+                                                onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.2)'}
+                                                onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                                                title="Reply"
+                                            >
+                                                <Reply size={18} />
+                                            </button>
+
+
+                                            {msg.sender === 'me' && (
+                                                <button
+                                                    onClick={() => {
+                                                        setEditingMessageId(msg.id);
+                                                        setInputText(msg.text || '');
+                                                    }}
+                                                    style={{
+                                                        background: 'none',
+                                                        border: 'none',
+                                                        cursor: 'pointer',
+                                                        color: 'rgba(255, 255, 255, 0.8)',
+                                                        padding: '4px',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        transition: 'transform 0.2s ease'
+                                                    }}
+                                                    onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.2)'}
+                                                    onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                                                    title="Edit"
+                                                >
+                                                    <Edit2 size={18} />
+                                                </button>
+                                            )}
+
                                             {msg.sender === 'me' && (
                                                 <button
                                                     onClick={() => handleDeleteMessage(msg.id)}
@@ -652,9 +919,16 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
                                         fontSize: '10px',
                                         opacity: 0.4,
                                         marginTop: '4px',
-                                        textAlign: msg.sender === 'me' ? 'right' : 'left'
+                                        textAlign: msg.sender === 'me' ? 'right' : 'left',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: msg.sender === 'me' ? 'flex-end' : 'flex-start',
+                                        gap: '4px'
                                     }}>
                                         {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        {msg.sender === 'me' && (
+                                            msg.read ? <CheckCheck size={12} color="#60a5fa" /> : <Check size={12} />
+                                        )}
                                     </div>
                                 </div>
                             ))
@@ -707,6 +981,73 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
                         background: 'rgba(0, 0, 0, 0.2)',
                         position: 'relative'
                     }}>
+                        {replyingTo && (
+                            <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                background: 'rgba(255,255,255,0.1)',
+                                padding: '8px',
+                                borderRadius: '8px',
+                                marginBottom: '8px',
+                                fontSize: '12px',
+                                color: 'rgba(255,255,255,0.8)'
+                            }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                    <span style={{ fontWeight: 'bold', color: '#60a5fa' }}>
+                                        Replying to {replyingTo.sender === 'me' ? 'yourself' : 'opponent'}
+                                    </span>
+                                    <span style={{
+                                        whiteSpace: 'nowrap',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        maxWidth: '200px'
+                                    }}>
+                                        {replyingTo.text || '[Image]'}
+                                    </span>
+                                </div>
+                                <button
+                                    onClick={() => setReplyingTo(null)}
+                                    style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        color: 'rgba(255,255,255,0.5)',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    <X size={14} />
+                                </button>
+                            </div>
+                        )}
+                        {editingMessageId && (
+                            <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                background: 'rgba(255,255,255,0.1)',
+                                padding: '8px',
+                                borderRadius: '8px',
+                                marginBottom: '8px',
+                                fontSize: '12px',
+                                color: 'rgba(255,255,255,0.8)'
+                            }}>
+                                <span style={{ fontWeight: 'bold', color: '#facc15' }}>Editing message</span>
+                                <button
+                                    onClick={() => {
+                                        setEditingMessageId(null);
+                                        setInputText('');
+                                    }}
+                                    style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        color: 'rgba(255,255,255,0.5)',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    <X size={14} />
+                                </button>
+                            </div>
+                        )}
                         {showEmojiPicker && (
                             <div style={{ position: 'absolute', bottom: '60px', left: '10px', zIndex: 200 }}>
                                 <EmojiPicker
@@ -761,6 +1102,7 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
                             </button>
 
                             <input
+                                ref={inputRef}
                                 type="text"
                                 value={inputText}
                                 onChange={handleInputChange}
@@ -801,6 +1143,137 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
                             </button>
                         </form>
                     </div>
+
+                    {/* Image Popup */}
+                    {selectedImage && (
+                        <div style={{
+                            position: 'fixed',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            background: 'rgba(0,0,0,0.95)',
+                            zIndex: 1000,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            animation: 'fadeIn 0.2s ease',
+                            backdropFilter: 'blur(5px)',
+                            overflow: 'hidden'
+                        }} onClick={() => { setSelectedImage(null); setZoom(1); }}>
+
+                            {/* Controls */}
+                            <div style={{
+                                position: 'fixed',
+                                bottom: '40px',
+                                left: '50%',
+                                transform: 'translateX(-50%)',
+                                background: 'rgba(20, 20, 20, 0.8)',
+                                backdropFilter: 'blur(12px)',
+                                padding: '12px 24px',
+                                borderRadius: '24px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '20px',
+                                zIndex: 1002,
+                                border: '1px solid rgba(255,255,255,0.1)',
+                                boxShadow: '0 8px 32px rgba(0,0,0,0.5)'
+                            }} onClick={e => e.stopPropagation()}>
+                                <button
+                                    onClick={() => setZoom(z => Math.max(0.5, z - 0.25))}
+                                    style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', padding: '4px', display: 'flex' }}
+                                    title="Zoom Out"
+                                >
+                                    <ZoomOut size={20} />
+                                </button>
+                                <span style={{ color: 'white', fontSize: '14px', fontWeight: 600, minWidth: '40px', textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>
+                                    {Math.round(zoom * 100)}%
+                                </span>
+                                <button
+                                    onClick={() => setZoom(z => Math.min(3, z + 0.25))}
+                                    style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', padding: '4px', display: 'flex' }}
+                                    title="Zoom In"
+                                >
+                                    <ZoomIn size={20} />
+                                </button>
+                                <div style={{ width: '1px', height: '24px', background: 'rgba(255,255,255,0.1)' }} />
+                                <a
+                                    href={selectedImage.src}
+                                    download={`chess_image_${selectedImage.id}.jpg`}
+                                    style={{ color: '#4ade80', display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none', fontSize: '14px', fontWeight: 600 }}
+                                    title="Download"
+                                >
+                                    <Download size={18} />
+                                    <span>Save</span>
+                                </a>
+                            </div>
+
+                            {/* Close Button */}
+                            <button
+                                onClick={() => { setSelectedImage(null); setZoom(1); }}
+                                style={{
+                                    position: 'fixed',
+                                    top: '30px',
+                                    right: '30px',
+                                    background: 'rgba(255, 255, 255, 0.1)',
+                                    border: 'none',
+                                    color: 'white',
+                                    cursor: 'pointer',
+                                    padding: '12px',
+                                    borderRadius: '50%',
+                                    zIndex: 1002,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    transition: 'all 0.2s ease',
+                                    backdropFilter: 'blur(4px)'
+                                }}
+                                onMouseOver={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.2)'; e.currentTarget.style.transform = 'rotate(90deg)'; }}
+                                onMouseOut={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; e.currentTarget.style.transform = 'rotate(0deg)'; }}
+                            >
+                                <X size={24} />
+                            </button>
+
+                            {/* Image */}
+                            <div
+                                ref={imageContainerRef}
+                                onMouseDown={handleMouseDown}
+                                onMouseMove={handleMouseMove}
+                                onMouseUp={handleMouseUp}
+                                onMouseLeave={handleMouseUp}
+                                style={{
+                                    width: '100%',
+                                    height: '100%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    overflow: 'auto',
+                                    cursor: zoom > 1 ? (isPanning ? 'grabbing' : 'grab') : 'default',
+                                    userSelect: 'none'
+                                }}
+                            >
+                                <img
+                                    src={selectedImage.src}
+                                    alt="Full size"
+                                    style={{
+                                        maxWidth: zoom === 1 ? '90vw' : 'none',
+                                        maxHeight: zoom === 1 ? '85vh' : 'none',
+                                        height: zoom === 1 ? 'auto' : `${zoom * 85}vh`,
+                                        borderRadius: '8px',
+                                        boxShadow: '0 0 40px rgba(0,0,0,0.5)',
+                                        transition: isPanning ? 'none' : 'all 0.2s ease',
+                                    }}
+                                    onClick={e => {
+                                        e.stopPropagation();
+                                        if (!hasPanningMoved.current) {
+                                            setZoom(z => z === 1 ? 2 : 1);
+                                        }
+                                    }}
+                                    draggable={false}
+                                />
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
         </>
