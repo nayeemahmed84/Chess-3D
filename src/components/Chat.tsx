@@ -233,7 +233,7 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
             if (msg.id === messageId) {
                 const existingReaction = msg.reactions[emoji];
 
-                if (existingReaction && (isMe ? existingReaction.userReacted : existingReaction.count > 0)) {
+                if (isMe && existingReaction && existingReaction.userReacted) {
                     const newCount = existingReaction.count - 1;
                     if (newCount === 0) {
                         const { [emoji]: removed, ...remainingReactions } = msg.reactions;
