@@ -44,6 +44,7 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [isDragging, setIsDragging] = useState(false);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -208,28 +209,52 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
         setShowEmojiPicker(false);
     };
 
+    const processFile = (file: File) => {
+        if (!isOpponentConnected) return;
+
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            const base64String = reader.result as string;
+            const messageId = Date.now().toString();
+            const timestamp = Date.now();
+            const newMessage: Message = {
+                id: messageId,
+                sender: 'me',
+                image: base64String,
+                timestamp: timestamp,
+                reactions: {}
+            };
+            setMessages(prev => [...prev, newMessage]);
+            multiplayerService.sendData({
+                type: 'image',
+                payload: { image: base64String, id: messageId, timestamp: timestamp }
+            });
+        };
+        reader.readAsDataURL(file);
+    };
+
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (file && isOpponentConnected) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                const base64String = reader.result as string;
-                const messageId = Date.now().toString();
-                const timestamp = Date.now();
-                const newMessage: Message = {
-                    id: messageId,
-                    sender: 'me',
-                    image: base64String,
-                    timestamp: timestamp,
-                    reactions: {}
-                };
-                setMessages(prev => [...prev, newMessage]);
-                multiplayerService.sendData({
-                    type: 'image',
-                    payload: { image: base64String, id: messageId, timestamp: timestamp }
-                });
-            };
-            reader.readAsDataURL(file);
+        if (file) processFile(file);
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+
+        const file = e.dataTransfer.files[0];
+        if (file && file.type.startsWith('image/')) {
+            processFile(file);
         }
     };
 
@@ -354,23 +379,60 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
             </button>
 
             {isOpen && (
-                <div style={{
-                    position: 'absolute',
-                    bottom: '80px',
-                    left: '20px',
-                    width: '320px',
-                    height: '450px',
-                    background: 'rgba(20, 20, 20, 0.95)',
-                    backdropFilter: 'blur(20px)',
-                    borderRadius: '16px',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    overflow: 'hidden',
-                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
-                    zIndex: 100,
-                    animation: 'slideUp 0.3s ease-out'
-                }}>
+                <div
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    style={{
+                        position: 'absolute',
+                        bottom: '80px',
+                        left: '20px',
+                        width: '320px',
+                        height: '450px',
+                        background: isDragging ? 'rgba(20, 20, 20, 0.98)' : 'rgba(20, 20, 20, 0.95)',
+                        backdropFilter: 'blur(20px)',
+                        borderRadius: '16px',
+                        border: isDragging ? '2px dashed #4ade80' : '1px solid rgba(255, 255, 255, 0.1)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        overflow: 'hidden',
+                        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
+                        zIndex: 100,
+                        animation: 'slideUp 0.3s ease-out',
+                        transition: 'all 0.2s ease'
+                    }}
+                >
+                    {isDragging && (
+                        <div style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            background: 'rgba(74, 222, 128, 0.1)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 300,
+                            pointerEvents: 'none',
+                            backdropFilter: 'blur(4px)'
+                        }}>
+                            <div style={{
+                                background: 'rgba(0,0,0,0.8)',
+                                padding: '20px',
+                                borderRadius: '16px',
+                                color: '#4ade80',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: '12px',
+                                border: '1px solid #4ade80'
+                            }}>
+                                <Paperclip size={48} />
+                                <span style={{ fontWeight: 'bold' }}>Drop image to share</span>
+                            </div>
+                        </div>
+                    )}
                     <div style={{
                         padding: '16px',
                         borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
