@@ -101,6 +101,13 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
         return () => window.removeEventListener('keydown', handleEsc);
     }, []);
 
+    // Auto-focus input when chat opens
+    useEffect(() => {
+        if (isOpen) {
+            setTimeout(() => inputRef.current?.focus(), 100);
+        }
+    }, [isOpen]);
+
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
@@ -866,13 +873,12 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
                                             >
                                                 <Reply size={18} />
                                             </button>
-
-
                                             {msg.sender === 'me' && (
                                                 <button
                                                     onClick={() => {
                                                         setEditingMessageId(msg.id);
                                                         setInputText(msg.text || '');
+                                                        inputRef.current?.focus();
                                                     }}
                                                     style={{
                                                         background: 'none',
@@ -891,6 +897,7 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
                                                     <Edit2 size={18} />
                                                 </button>
                                             )}
+
 
                                             {msg.sender === 'me' && (
                                                 <button
@@ -1274,7 +1281,7 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
                             </div>
                         </div>
                     )}
-                </div>
+                </div >
             )}
         </>
     );
