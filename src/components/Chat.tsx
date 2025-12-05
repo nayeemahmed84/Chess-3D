@@ -723,6 +723,10 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
                                     }}
                                     onMouseEnter={() => setHoveredMessageId(msg.id)}
                                     onMouseLeave={() => setHoveredMessageId(null)}
+                                    onDoubleClick={() => {
+                                        setReplyingTo(msg);
+                                        inputRef.current?.focus();
+                                    }}
                                 >
                                     <div style={{
                                         background: (!msg.image && msg.text && isOnlyEmojis(msg.text)) ? 'transparent' : (msg.sender === 'me' ? '#3b82f6' : 'rgba(255, 255, 255, 0.1)'),
