@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, X, MessageCircle, Lock, Shield, Smile, Paperclip, Trash2 } from 'lucide-react';
+import { Send, X, MessageCircle, Lock, Shield, Smile, Paperclip, Trash2, Loader } from 'lucide-react';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { multiplayerService } from '../services/MultiplayerService';
 import messageSoundUrl from '../assets/sounds/message.mp3';
@@ -46,6 +46,7 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
     const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isDragging, setIsDragging] = useState(false);
+    const [isUploading, setIsUploading] = useState(false);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -212,6 +213,7 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
 
     const processFile = async (file: File) => {
         if (!isOpponentConnected) return;
+        setIsUploading(true);
 
         let fileToProcess = file;
 
@@ -250,6 +252,7 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
                 type: 'image',
                 payload: { image: base64String, id: messageId, timestamp: timestamp }
             });
+            setIsUploading(false);
         };
         reader.readAsDataURL(fileToProcess);
     };
@@ -352,6 +355,11 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
 
     return (
         <>
+            <style>
+                {`
+                    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+                `}
+            </style>
             <button
                 onClick={onToggle}
                 style={{
@@ -668,6 +676,25 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
                                 <span style={{ animation: 'bounce 1s infinite', animationDelay: '0s' }}>•</span>
                                 <span style={{ animation: 'bounce 1s infinite', animationDelay: '0.2s' }}>•</span>
                                 <span style={{ animation: ' bounce 1s infinite', animationDelay: '0.4s' }}>•</span>
+                            </div>
+                        )}
+
+                        {isUploading && (
+                            <div style={{
+                                alignSelf: 'flex-end',
+                                background: 'rgba(59, 130, 246, 0.2)',
+                                padding: '8px 12px',
+                                borderRadius: '12px 12px 0 12px',
+                                fontSize: '12px',
+                                color: 'white',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                animation: 'fadeIn 0.2s ease',
+                                marginBottom: '8px'
+                            }}>
+                                <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                                <span>Sending image...</span>
                             </div>
                         )}
 
