@@ -7,7 +7,9 @@ import { SaveLoadModal } from './SaveLoadModal';
 import { PGNModal } from './PGNModal';
 import { CapturedPieces } from './CapturedPieces';
 import { MultiplayerMenu } from './MultiplayerMenu';
-import { RotateCcw, RotateCw, Trophy, ChevronLeft, ChevronRight, Volume2, VolumeX, Maximize, Minimize, Save, Upload, Check, AlertTriangle, X, Download, Users } from 'lucide-react';
+import { TrainingMenu, TrainingMode } from './TrainingMenu';
+import { PuzzleMode } from './PuzzleMode';
+import { RotateCcw, RotateCw, Trophy, ChevronLeft, ChevronRight, Volume2, VolumeX, Maximize, Minimize, Save, Upload, Check, AlertTriangle, X, Download, Users, GraduationCap } from 'lucide-react';
 import { open } from '@tauri-apps/plugin-shell';
 import Chat from './Chat';
 const animationStyles = `
@@ -56,6 +58,8 @@ const Game = () => {
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [notification, setNotification] = useState<{ type: 'success' | 'confirm' | 'error', message: string, onConfirm?: () => void } | null>(null);
     const [connectionStatusMessage, setConnectionStatusMessage] = useState<'connected' | 'disconnected' | null>(null);
+    const [trainingMode, setTrainingMode] = useState<TrainingMode>('menu');
+    const [showTraining, setShowTraining] = useState(false);
 
     const toggleFullscreen = () => {
         if (!document.fullscreenElement) {
@@ -231,6 +235,28 @@ const Game = () => {
             <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>• You are watching</span>
         </div>
     );
+    // Show Training Menu if active
+    if (showTraining) {
+        if (trainingMode === 'puzzles') {
+            return <PuzzleMode onExit={() => {
+                setTrainingMode('menu');
+            }} />;
+        }
+        return <TrainingMenu
+            onSelectMode={(mode) => {
+                if (mode === 'menu') {
+                    setShowTraining(false);
+                } else {
+                    setTrainingMode(mode);
+                }
+            }}
+            onExit={() => {
+                setShowTraining(false);
+                setTrainingMode('menu');
+            }}
+        />;
+    }
+
     return (
         <div style={{ width: '100%', height: '100%', position: 'relative', background: '#1a1a1a' }}>
             {isSpectator && <SpectatorBanner />}
@@ -555,6 +581,32 @@ const Game = () => {
                             Online
                         </button>
                     </div>
+                    {/* Training Button */}
+                    <button
+                        onClick={() => setShowTraining(true)}
+                        style={{
+                            width: '100%',
+                            marginTop: '8px',
+                            padding: '10px',
+                            background: 'linear-gradient(135deg, rgba(96, 165, 250, 0.3), rgba(167, 139, 250, 0.3))',
+                            color: 'white',
+                            border: '1px solid rgba(255, 255, 255, 0.2)',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            fontWeight: 500,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                            transition: 'all 0.2s'
+                        }}
+                        onMouseOver={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, rgba(96, 165, 250, 0.5), rgba(167, 139, 250, 0.5))'}
+                        onMouseOut={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, rgba(96, 165, 250, 0.3), rgba(167, 139, 250, 0.3))'}
+                    >
+                        <GraduationCap size={16} />
+                        Training Center
+                    </button>
                 </div>
 
                 {gameMode === 'ai' && (
