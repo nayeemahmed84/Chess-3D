@@ -59,6 +59,19 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
         }
     }, [isOpen]);
 
+    const playSound = () => {
+        try {
+            const audio = notificationSound.current;
+            audio.currentTime = 0;
+            const playPromise = audio.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(e => console.log('Audio play failed:', e));
+            }
+        } catch (error) {
+            console.log('Sound playback error:', error);
+        }
+    };
+
     useEffect(() => {
         const handleChatEvent = (e: CustomEvent<{ text: string, id: string, timestamp: number }>) => {
             const newMessage: Message = {
@@ -118,7 +131,6 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
             } else {
                 addReaction(messageId, emoji, false);
             }
-            // Play sound for reaction
             playSound();
         };
 
@@ -126,11 +138,16 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
             setMessages([]);
         };
 
+        const handleDeleteMessageEvent = (e: CustomEvent<string>) => {
+            setMessages(prev => prev.filter(msg => msg.id !== e.detail));
+        };
+
         window.addEventListener('chess-chat-message' as any, handleChatEvent as any);
         window.addEventListener('chess-chat-image' as any, handleImageEvent as any);
         window.addEventListener('chess-chat-typing' as any, handleTypingEvent as any);
         window.addEventListener('chess-chat-reaction' as any, handleReactionEvent as any);
         window.addEventListener('chess-chat-clear' as any, handleClearHistoryEvent as any);
+        window.addEventListener('chess-chat-delete' as any, handleDeleteMessageEvent as any);
 
         return () => {
             window.removeEventListener('chess-chat-message' as any, handleChatEvent as any);
@@ -138,21 +155,9 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
             window.removeEventListener('chess-chat-typing' as any, handleTypingEvent as any);
             window.removeEventListener('chess-chat-reaction' as any, handleReactionEvent as any);
             window.removeEventListener('chess-chat-clear' as any, handleClearHistoryEvent as any);
+            window.removeEventListener('chess-chat-delete' as any, handleDeleteMessageEvent as any);
         };
     }, [isOpen]);
-
-    const playSound = () => {
-        try {
-            const audio = notificationSound.current;
-            audio.currentTime = 0;
-            const playPromise = audio.play();
-            if (playPromise !== undefined) {
-                playPromise.catch(e => console.log('Audio play failed:', e));
-            }
-        } catch (error) {
-            console.log('Sound playback error:', error);
-        }
-    };
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setInputText(e.target.value);
@@ -289,6 +294,15 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
         setMessages([]);
         multiplayerService.sendData({ type: 'chat_clear', payload: true });
     };
+
+    const handleDeleteMessage = (messageId: string) => {
+        setMessages(prev => prev.filter(msg => msg.id !== messageId));
+        if (isOpponentConnected) {
+            multiplayerService.sendData({ type: 'chat_delete', payload: messageId });
+        }
+    };
+
+
 
     return (
         <>
@@ -515,6 +529,31 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onToggle, isOpponentConnected }) =>
                                                     {emoji}
                                                 </button>
                                             ))}
+
+                                            {msg.sender === 'me' && (
+                                                <div style={{ width: '1px', height: '24px', background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />
+                                            )}
+
+                                            {msg.sender === 'me' && (
+                                                <button
+                                                    onClick={() => handleDeleteMessage(msg.id)}
+                                                    style={{
+                                                        background: 'none',
+                                                        border: 'none',
+                                                        cursor: 'pointer',
+                                                        color: '#ef4444',
+                                                        padding: '4px',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        transition: 'transform 0.2s ease'
+                                                    }}
+                                                    onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.2)'}
+                                                    onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                                                    title="Delete for everyone"
+                                                >
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            )}
                                         </div>
                                     )}
 
